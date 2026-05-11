@@ -5,7 +5,6 @@ import {
   Box, 
   BookOpen, 
   Wallet, 
-  Bridge, 
   DollarSign, 
   BarChart3, 
   Shield, 
