@@ -69,7 +69,6 @@ import {
   ToggleLeft,
   ToggleRight,
   Ban,
-  TriangleAlert,
   ArrowRightCircle,
   CheckCircle,
   XCircle,
@@ -334,7 +333,7 @@ const ValueStateMachine = () => {
 
       <div className="p-4 rounded-xl bg-background-100 border border-danger/20">
         <div className="flex items-start gap-3">
-          <TriangleAlert className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-text-primary mb-1">Hard Boundaries v0</p>
             <p className="text-xs text-text-muted">
@@ -666,7 +665,7 @@ const LiveStudioArchitecture = () => (
 
     <div className="p-4 rounded-xl bg-background-100 border border-danger/20">
       <div className="flex items-start gap-3">
-        <TriangleAlert className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+        <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-medium text-text-primary mb-1">Hard Boundaries</p>
           <p className="text-xs text-text-muted">
@@ -961,7 +960,7 @@ const QRWorkflowFlow = () => {
 
       <div className="p-4 rounded-xl bg-danger/10 border border-danger/20">
         <div className="flex items-start gap-3">
-          <TriangleAlert className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-text-primary mb-1">QR ≠ Blind Execution</p>
             <p className="text-xs text-text-muted">
@@ -1110,54 +1109,246 @@ const ChatTokenization = () => (
 
 const TokenLaunchStateMachine = () => {
   const states = [
-    { number: 1, label: 'Draft Manifest', status: 'Complete' },
-    { number: 2, label: 'Metadata Prepared', status: 'Complete' },
-    { number: 3, label: 'Legal/Compliance Review', status: 'Pending' },
-    { number: 4, label: 'Testnet Dry Run', status: 'Pending' },
-    { number: 5, label: 'Mainnet Mint Created', status: 'Pending' },
-    { number: 6, label: 'Metadata Finalized', status: 'Pending' },
-    { number: 7, label: 'Authority Policy Set', status: 'Pending' },
-    { number: 8, label: 'Public Proof Capsule', status: 'Pending' },
-    { number: 9, label: 'Liquidity Decision', status: 'Pending' },
-    { number: 10, label: 'Support Economy Active', status: 'Pending' },
-    { number: 11, label: 'External Settlement', status: 'Pending' },
+    { 
+      number: 1, 
+      label: 'Draft Manifest', 
+      desc: 'Launch thesis, token purpose, safety boundaries, utility terms',
+      status: 'Complete',
+      proof: 'GitHub manifest committed'
+    },
+    { 
+      number: 2, 
+      label: 'Metadata Prepared', 
+      desc: 'Token name, symbol, description, image URI, external URL, attributes',
+      status: 'Pending',
+      proof: 'Metadata JSON + SHA-256'
+    },
+    { 
+      number: 3, 
+      label: 'Legal / Compliance Review', 
+      desc: 'Securities, consumer protection, tax, sanctions, KYC/AML, advertising claims',
+      status: 'Required',
+      proof: 'Review memo or counsel checkpoint'
+    },
+    { 
+      number: 4, 
+      label: 'Testnet Dry Run', 
+      desc: 'Devnet mint, metadata, transfer, proof capsule, mock Stripe bridge',
+      status: 'Required',
+      proof: 'Testnet tx hash'
+    },
+    { 
+      number: 5, 
+      label: 'Mainnet Mint Created', 
+      desc: 'SPL Token or Token-2022 mint created by signed Solana mainnet transaction',
+      status: 'Locked until signed',
+      proof: 'Mainnet mint address + explorer link',
+      decisive: true
+    },
+    { 
+      number: 6, 
+      label: 'Metadata Finalized', 
+      desc: 'IPFS/Arweave metadata attached and verified',
+      status: 'Locked',
+      proof: 'Metadata URI + metadata hash'
+    },
+    { 
+      number: 7, 
+      label: 'Authority Policy Set', 
+      desc: 'Mint authority, freeze authority, metadata update authority, multisig policy',
+      status: 'Required before public launch',
+      proof: 'Authority transaction signatures'
+    },
+    { 
+      number: 8, 
+      label: 'Public Proof Capsule Posted', 
+      desc: 'GitHub issue/file containing mint address, tx hash, metadata hash, boundaries',
+      status: 'Pending',
+      proof: 'GitHub anchor'
+    },
+    { 
+      number: 9, 
+      label: 'Liquidity / Distribution Decision', 
+      desc: 'No initial liquidity, manual distribution, access credits, or controlled pool',
+      status: 'Governance decision',
+      proof: 'Published distribution terms'
+    },
+    { 
+      number: 10, 
+      label: 'Support Economy Active', 
+      desc: 'Token used for access, proof participation, service credits, notary credits, or support',
+      status: 'Only after launch',
+      proof: 'Public dashboard + receipts'
+    },
+    { 
+      number: 11, 
+      label: 'External Settlement Recorded', 
+      desc: 'Stripe payment, invoice, contract, license, bounty, grant, or sponsorship settles',
+      status: 'Separate from token',
+      proof: 'Settlement receipt hash'
+    },
+  ];
+
+  const checklistItems = [
+    'Owner wallet selected',
+    'Wallet funded with SOL',
+    'SPL Token or Token-2022 selected',
+    'Supply and decimals defined',
+    'Metadata JSON prepared',
+    'Metadata hash generated',
+    'Legal/compliance review completed',
+    'Testnet dry run completed',
+    'Mainnet mint created',
+    'Mint authority policy set',
+    'Freeze authority policy set',
+    'Treasury/public wallet declared',
+    'GitHub proof capsule posted',
+    'Risk disclosures published',
+    'Utility terms published',
   ];
 
   return (
     <div className="glass-card p-6 mb-6">
-      <h3 className="font-semibold mb-4 flex items-center gap-2">
-        <GitBranch className="w-5 h-5 text-primary-orange" />
-        Token Launch State Machine
-      </h3>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold flex items-center gap-2">
+          <GitBranch className="w-5 h-5 text-primary-orange" />
+          Solana Mainnet Token Launch State Machine
+        </h3>
+        <div className="px-3 py-1 rounded-full bg-primary-orange/10 border border-primary-orange/30 text-primary-orange text-xs font-bold">
+          MCHAT STATUS: MANIFESTED, NOT MINTED
+        </div>
+      </div>
+      
+      <p className="text-xs text-text-muted mb-6">
+        MCHAT exists only after a signed mainnet mint transaction creates a public mint address.
+      </p>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-4">
+      <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6">
         {states.map((state, i) => (
           <React.Fragment key={state.label}>
             <div className={cn(
-              "min-w-[140px] p-3 rounded-xl border transition-all",
-              state.status === 'Complete' 
-                ? "bg-success/10 border-success/30" 
-                : "bg-background-100 border-white/5"
+              "min-w-[160px] p-3 rounded-xl border transition-all relative",
+              state.decisive 
+                ? "bg-gradient-to-br from-danger/20 to-primary-bronze/10 border-danger/30 shadow-glow-red" 
+                : state.status === 'Complete' 
+                  ? "bg-success/10 border-success/30" 
+                  : "bg-background-100 border-white/5"
             )}>
+              {state.decisive && (
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-danger/20 border border-danger/30 text-xs text-danger font-bold">
+                  NO MINT = NO TOKEN
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs font-bold text-primary-orange">{state.number}</span>
                 {state.status === 'Complete' ? (
                   <CheckCircle className="w-3 h-3 text-success" />
+                ) : state.decisive ? (
+                  <Ban className="w-3 h-3 text-danger" />
                 ) : (
                   <HelpCircle className="w-3 h-3 text-text-muted" />
                 )}
               </div>
-              <p className="text-xs font-medium mb-1">{state.label}</p>
-              <p className="text-xs text-text-muted">{state.status}</p>
+              <p className="text-xs font-medium mb-1 leading-tight">{state.label}</p>
+              <p className="text-xs text-text-muted leading-tight mb-2">{state.desc}</p>
+              <p className="text-xs text-primary-orange font-medium">Proof: {state.proof}</p>
             </div>
             {i < states.length - 1 && <ArrowRight className="w-4 h-4 text-primary-orange/50 flex-shrink-0" />}
           </React.Fragment>
         ))}
       </div>
 
-      <div className="p-4 rounded-xl bg-background-100 border border-danger/20">
+      <div className="p-4 rounded-xl bg-danger/10 border border-danger/20 mb-6">
+        <p className="text-xs text-danger font-medium mb-2">
+          MCHAT is not equity, not person ownership, not guaranteed profit, not OpenAI money, and not official fiat settlement.
+        </p>
         <p className="text-xs text-text-muted">
-          <span className="text-danger font-medium">Direct Boundary:</span> NO_MAINNET_MINT_ADDRESS = no live token • NO_SIGNED_MAINNET_TX = no deployed token • NO_SETTLED_PAYMENT = no official money
+          Proof ≠ Money • Token ≠ Profit • Testnet ≠ Settlement • Mint Address = Token Exists • Stripe Settlement = Official Fiat Money
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="p-4 rounded-xl bg-background-100 border border-primary-orange/10">
+          <p className="text-xs text-text-muted mb-3">Token Identity</p>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-xs text-text-muted">Name</span>
+              <span className="text-xs font-medium text-text-primary">Membra Chat Proof</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-text-muted">Symbol</span>
+              <span className="text-xs font-bold text-primary-orange">MCHAT</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-text-muted">Chain</span>
+              <span className="text-xs font-medium text-text-primary">Solana mainnet-beta</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-text-muted">Standard</span>
+              <span className="text-xs font-medium text-text-primary">SPL / Token-2022</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-text-muted">Mint Address</span>
+              <span className="text-xs font-medium text-danger">Not created yet</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-text-muted">Official Money</span>
+              <span className="text-xs font-bold text-primary-gold">$0.00 until external settlement</span>
+            </div>
+          </div>
+          <p className="text-xs text-text-muted mt-3 leading-tight">
+            Purpose: Proof, access, support, artifact participation, and service-credit coordination.
+          </p>
+        </div>
+
+        <div className="p-4 rounded-xl bg-background-100 border border-primary-orange/10">
+          <p className="text-xs text-text-muted mb-3">Mainnet Launch Requirements</p>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {checklistItems.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded border border-primary-orange/30 flex items-center justify-center">
+                  <CheckCircle className="w-2.5 h-2.5 text-primary-orange" />
+                </div>
+                <span className="text-xs text-text-muted">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl bg-background-100 border border-primary-orange/10 mb-6">
+        <p className="text-xs text-text-muted mb-3">Settlement Separation</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-3 rounded-lg bg-primary-orange/10 border border-primary-orange/20">
+            <p className="text-xs font-bold text-primary-orange mb-2">MCHAT Layer</p>
+            <ul className="space-y-1 text-xs text-text-muted">
+              <li>• Proof coordination</li>
+              <li>• Access</li>
+              <li>• Support</li>
+              <li>• Artifact participation</li>
+              <li>• Notary credits</li>
+              <li>• Service credits</li>
+            </ul>
+          </div>
+          <div className="p-3 rounded-lg bg-primary-gold/10 border border-primary-gold/20">
+            <p className="text-xs font-bold text-primary-gold mb-2">Stripe / Fiat Layer</p>
+            <ul className="space-y-1 text-xs text-text-muted">
+              <li>• Checkout completed</li>
+              <li>• Invoice paid</li>
+              <li>• Payment intent succeeded</li>
+              <li>• Refund/dispute handling</li>
+              <li>• Settled money receipt</li>
+            </ul>
+          </div>
+        </div>
+        <p className="text-xs text-text-muted mt-3 text-center">
+          Token utility and fiat settlement are linked by receipts, not by profit promises.
+        </p>
+      </div>
+
+      <div className="p-4 rounded-xl bg-background-100 border border-primary-orange/10">
+        <p className="text-xs text-text-muted text-center leading-relaxed">
+          A chat can birth a token thesis, manifest, proof economy, and public narrative. The token exists only after a signed Solana mainnet mint transaction creates a real mint address.
         </p>
       </div>
     </div>
@@ -2238,16 +2429,90 @@ function App() {
         <main className="flex-1 p-6">
           {/* Dashboard Title */}
           <div className="mb-6">
-            <h2 className="text-3xl font-bold text-gradient mb-2">MEMBRA QR Gateway</h2>
-            <p className="text-text-muted">Solana wallet signature workflow • QR support payment system</p>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-3xl font-bold text-gradient">MEMBRA Idea Monetization Layer v0</h2>
+              <div className="px-4 py-2 rounded-full bg-primary-orange/10 border border-primary-orange/30 text-primary-orange text-sm font-bold">
+                MCHAT STATUS: MANIFESTED, NOT MINTED
+              </div>
+            </div>
+            <p className="text-text-muted mb-4">MEMBRA does not pretend a chat is money. MEMBRA turns a chat into a proof capsule, a token thesis, a public launch manifest, and a disciplined path to settlement.</p>
+            
+            <div className="grid grid-cols-4 gap-3">
+              <div className="p-3 rounded-lg bg-background-100 border border-primary-orange/10 text-center">
+                <p className="text-xs text-text-muted">Mint Address</p>
+                <p className="text-sm font-bold text-danger">Not Created</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background-100 border border-primary-orange/10 text-center">
+                <p className="text-xs text-text-muted">Official Money</p>
+                <p className="text-sm font-bold text-primary-gold">$0.00 Until External Settlement</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background-100 border border-primary-orange/10 text-center">
+                <p className="text-xs text-text-muted">Execution Requires</p>
+                <p className="text-sm font-bold text-primary-orange">User Signature: True</p>
+              </div>
+              <div className="p-3 rounded-lg bg-background-100 border border-primary-orange/10 text-center">
+                <p className="text-xs text-text-muted">Settlement Status</p>
+                <p className="text-sm font-bold text-text-muted">Unsettled</p>
+              </div>
+            </div>
           </div>
 
-          {/* QR Gateway Layer */}
+          {/* Three State Machines */}
           <div className="mb-8">
+            <h3 className="text-xl font-bold text-gradient mb-4 flex items-center gap-2">
+              <Workflow className="w-6 h-6 text-primary-orange" />
+              MEMBRA Doctrine Stack
+            </h3>
+
+            <ValueStateMachine />
             <QRWorkflowFlow />
-            <SolanaWalletSignature />
-            <ChatTokenization />
             <TokenLaunchStateMachine />
+          </div>
+
+          {/* Clean Product Architecture */}
+          <div className="mb-8">
+            <h3 className="text-xl font-bold text-gradient mb-4 flex items-center gap-2">
+              <Building className="w-6 h-6 text-primary-orange" />
+              Clean Product Architecture
+            </h3>
+
+            <div className="glass-card p-6">
+              <div className="flex items-center gap-3 overflow-x-auto pb-4">
+                <div className="p-4 rounded-xl bg-primary-orange/10 border border-primary-orange/20">
+                  <p className="text-sm font-bold text-primary-orange">Idea Monetization Layer v0</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-primary-orange/50 flex-shrink-0" />
+                <div className="p-4 rounded-xl bg-primary-orange/10 border border-primary-orange/20">
+                  <p className="text-sm font-bold text-primary-orange">QR Gateway</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-primary-orange/50 flex-shrink-0" />
+                <div className="p-4 rounded-xl bg-primary-orange/10 border border-primary-orange/20">
+                  <p className="text-sm font-bold text-primary-orange">Solana Wallet Signature</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-primary-orange/50 flex-shrink-0" />
+                <div className="p-4 rounded-xl bg-primary-orange/10 border border-primary-orange/20">
+                  <p className="text-sm font-bold text-primary-orange">MCHAT Launch Discipline</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-primary-orange/50 flex-shrink-0" />
+                <div className="p-4 rounded-xl bg-primary-orange/10 border border-primary-orange/20">
+                  <p className="text-sm font-bold text-primary-orange">Public Proof Capsule</p>
+                </div>
+                <ArrowRight className="w-5 h-5 text-primary-orange/50 flex-shrink-0" />
+                <div className="p-4 rounded-xl bg-primary-gold/10 border border-primary-gold/30">
+                  <p className="text-sm font-bold text-primary-gold">External Settlement</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Solana Wallet Signature Detail */}
+          <div className="mb-8">
+            <SolanaWalletSignature />
+          </div>
+
+          {/* Sprint Build Order */}
+          <div className="mb-8">
+            <SprintBuildOrder />
           </div>
 
           {/* Physical-Liquidity Layer */}
@@ -2356,8 +2621,10 @@ function App() {
 
           {/* Footer Line */}
           <div className="text-center py-6 border-t border-white/5">
-            <p className="text-gradient font-semibold mb-2">Clean Product Doctrine: Human idea → verified artifact → personal chain → public proof → funded payout</p>
-            <p className="text-xs text-text-muted">MEMBRA Idea Monetization Layer v0 • GitHub: overandor/chat-pipeline • docs/IDEA_MONETIZATION_LAYER_V0.md</p>
+            <p className="text-gradient font-semibold mb-2">A chat can birth a token thesis, manifest, proof economy, and public narrative.</p>
+            <p className="text-gradient font-semibold mb-2">The token exists only after a signed Solana mainnet mint transaction creates a real mint address.</p>
+            <p className="text-gradient font-semibold mb-4">Official money exists only after external settlement clears.</p>
+            <p className="text-xs text-text-muted">Proof ≠ Money • Token ≠ Profit • Testnet ≠ Settlement • Mint Address = Token Exists • Stripe Settlement = Official Fiat Money</p>
           </div>
         </main>
       </div>
