@@ -1106,6 +1106,98 @@ const ChatTokenization = () => (
   </div>
 );
 
+const DeterministicProfitCapture = () => {
+  const states = [
+    { number: 1, label: 'COMPUTE_ALLOCATED', desc: 'GPU/LLM budget assigned to job', status: 'Active', proof: 'Job spec + cost basis estimate' },
+    { number: 2, label: 'VALUE_DENSITY_GENERATED', desc: 'LLM produces artifact; scored for value density', status: 'Complete', proof: 'Artifact hash + density score' },
+    { number: 3, label: 'ARTIFACT_PROVEN', desc: 'SHA-256 hash + model provenance recorded', status: 'Complete', proof: 'Proof packet on-chain' },
+    { number: 4, label: 'MARKET_ROUTED', desc: 'Artifact routed to best-fit market by score', status: 'Complete', proof: 'Route decision record' },
+    { number: 5, label: 'PAYMENT_REQUESTED', desc: 'Invoice created with artifact hash anchor', status: 'Active', proof: 'Invoice ID + amount USD' },
+    { number: 6, label: 'SETTLEMENT_WATCHING', desc: 'Polling/webhook waiting for external settlement', status: 'Watching', proof: 'Watcher heartbeat' },
+    { number: 7, label: 'PAYMENT_RECEIVED / NO_PAYMENT', desc: 'Counterparty pays or does not pay', status: 'Pending', proof: 'Settlement receipt or timeout' },
+    { number: 8, label: 'COST_BASIS_CALCULATED', desc: 'Input + output token costs summed', status: 'Auto', proof: 'Cost basis USD' },
+    { number: 9, label: 'PROFIT_CAPTURED / LOSS_RECORDED', desc: 'Net = Revenue - Cost Basis. Only settled profit is real.', status: 'Locked', proof: 'Net profit/loss USD' },
+    { number: 10, label: 'CONSENSUS_FINALIZED', desc: 'Multi-attestor consensus finalizes on-chain state', status: 'Requires attestations', proof: 'Attestation count ≥ threshold' },
+  ];
+
+  const outcomeBadges = [
+    { label: 'Deterministic Workflow', value: 'Active', color: 'text-success' },
+    { label: 'Profit Generation Claim', value: 'DISABLED', color: 'text-danger' },
+    { label: 'Value Density Generated', value: 'Yes', color: 'text-success' },
+    { label: 'Payment Requested', value: 'Yes', color: 'text-success' },
+    { label: 'Settlement Received', value: 'No', color: 'text-text-muted' },
+    { label: 'Captured Profit', value: '$0.00 until settled', color: 'text-text-muted' },
+    { label: 'Consensus Status', value: 'Pending', color: 'text-primary-gold' },
+  ];
+
+  return (
+    <div className="glass-card p-6 mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary-orange" />
+          Deterministic Profit Capture v0
+        </h3>
+        <div className="px-3 py-1 rounded-full bg-danger/10 border border-danger/30 text-danger text-xs font-bold">
+          PROFIT GENERATION CLAIM: DISABLED
+        </div>
+      </div>
+
+      <p className="text-xs text-text-muted mb-4">
+        MEMBRA deterministically transforms compute into value-density artifacts, routes them toward markets, and captures verified profit events by consensus when external settlement occurs.
+      </p>
+
+      <div className="grid grid-cols-7 gap-2 mb-6">
+        {outcomeBadges.map((badge) => (
+          <div key={badge.label} className="p-2 rounded-lg bg-background-100 border border-white/5 text-center">
+            <p className="text-[10px] text-text-muted leading-tight">{badge.label}</p>
+            <p className={`text-xs font-bold ${badge.color}`}>{badge.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-4">
+        {states.map((state, i) => (
+          <React.Fragment key={state.label}>
+            <div className={cn(
+              "flex-shrink-0 w-48 p-3 rounded-xl border transition-all",
+              state.status === 'Active' ? 'bg-primary-orange/10 border-primary-orange/30' :
+              state.status === 'Complete' ? 'bg-success/10 border-success/30' :
+              state.status === 'Watching' ? 'bg-primary-gold/10 border-primary-gold/30' :
+              state.status === 'Pending' ? 'bg-background-100 border-white/5' :
+              'bg-background-100 border-white/5'
+            )}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={cn(
+                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                  state.status === 'Active' ? 'bg-primary-orange text-white' :
+                  state.status === 'Complete' ? 'bg-success text-white' :
+                  state.status === 'Watching' ? 'bg-primary-gold text-black' :
+                  'bg-white/10 text-text-muted'
+                )}>
+                  {state.number}
+                </span>
+                <span className="text-xs font-semibold">{state.label}</span>
+              </div>
+              <p className="text-[10px] text-text-muted mb-1">{state.desc}</p>
+              <p className="text-[10px] text-primary-gold">{state.proof}</p>
+            </div>
+            {i < states.length - 1 && (
+              <ArrowRight className="w-5 h-5 text-primary-orange/30 flex-shrink-0" />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="p-3 rounded-lg bg-danger/5 border border-danger/20">
+        <p className="text-xs text-danger font-semibold mb-1">Doctrinal Truth</p>
+        <p className="text-xs text-text-muted">
+          Expected Profit = P(Settlement) × Expected Revenue − Cost Basis. Captured Profit = Settled Revenue − Cost Basis. Only captured profit is real. A MEMBRA smart contract never contains <code>generate_profit</code>. It contains <code>submit_revenue_attempt</code>, <code>capture_profit</code>, and <code>record_loss</code>.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const TokenLaunchStateMachine = () => {
   const states = [
     { 
@@ -2466,6 +2558,7 @@ function App() {
             <ValueStateMachine />
             <QRWorkflowFlow />
             <TokenLaunchStateMachine />
+            <DeterministicProfitCapture />
           </div>
 
           {/* Clean Product Architecture */}
