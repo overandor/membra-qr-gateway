@@ -1,62 +1,97 @@
-# MEMBRA HUMAN CHAIN
+# MEMBRA QR Gateway
 
-Human Value Infrastructure for Verified Ideas, Wallets, Provenance, and Monetization.
+MEMBRA QR Gateway is the premium dashboard and tracking interface for the MEMBRA ecosystem.
 
-## Overview
+It provides the visual command center for QR/NFC proof media, artifact ledgers, owner dashboards, advertiser dashboards, scan events, reward status, payout readiness, proof review, wallet boundaries, analytics, and trust signals.
 
-MEMBRA turns private human reality into permissioned economic utility. This dashboard provides a production-grade interface for managing verified human artifacts, personal chains, and cross-chain monetization.
+## One-line thesis
 
-## Features
+MEMBRA QR Gateway turns QR/NFC interactions into visible proof, attribution, analytics, and monetizable campaign intelligence.
 
-- **Hero/System Header**: Doctrine line showing the complete artifact lifecycle
-- **Left Sidebar**: Navigation with network status and trust metrics
-- **KPI Cards**: Real-time metrics for artifacts, ledger events, wallet balance, and build epochs
-- **Public Support Wallet**: QR code and public address management
-- **Omni-Artifact Gateway**: QR-centered system for wallet, diagram, pitch, and execution triggers
-- **Personal Blockchain Per Human**: Visual representation of your personal chain across multiple networks
-- **Provenance Module**: Public proof layer with GitHub, IPFS, and onchain verification
-- **Reproducidescribe Loop**: Continuous artifact reproduction workflow
-- **Conceptual Scan Reward Curve**: Visual representation of reward decay model
-- **Live Artifact Engine**: Real-time logs and event stream
-- **Recent Artifacts Table**: Track all your artifacts with status and payment information
-- **Mobile UI Preview**: Responsive design preview for mobile devices
-- **Footer System Strip**: Quick access to wallet, ledger, notary, pricing, and payout systems
+## Product role
 
-## Design System
+This repository is the frontend and command-center layer for:
 
-- **Background**: Dark charcoal (#050505, #0B0D10, #111318)
-- **Primary Colors**: Orange (#FF8A1F), Gold (#D6A64F), Bronze (#9A6A35)
-- **Typography**: Inter for UI, JetBrains Mono for code/hashes
-- **Style**: Glassmorphic cards, thin orange borders, glowing circuit lines, premium dashboard components
+- MEMBRA Ads
+- MEMBRA Wear
+- MEMBRA Relay
+- MEMBRA Wallet
+- MEMBRA KPI
+- ProofBook records
+- QR/NFC scan attribution
+- owner and advertiser reporting
 
-## Installation
+## Core modules
+
+- campaign overview
+- owner inventory dashboard
+- advertiser campaign dashboard
+- QR/NFC scan console
+- ProofBook ledger view
+- payout and reward status
+- trust center
+- artifact provenance
+- wallet status panel
+- analytics charts
+- mobile preview
+
+## Existing UI foundation
+
+The app uses React, Vite, Tailwind-style components, Lucide icons, glassmorphic dashboard cards, QR-oriented visual language, wallet panels, proof lifecycle concepts, inventory screens, payout views, and trust-center navigation.
+
+## MEMBRA Ads integration
+
+QR Gateway should display:
+
+- campaigns
+- media kits
+- QR IDs
+- NFC IDs
+- proof events
+- scan events
+- owner placements
+- advertiser reports
+- kit delivery status
+- reward eligibility
+- claims and disputes
+
+## QR/NFC law
+
+Every QR or NFC tag must route through Membra first.
+
+Direct advertiser URLs break attribution, fraud checks, analytics, proof reporting, and reward eligibility.
+
+## Dashboard doctrine
+
+A campaign is not real until the dashboard can show:
+
+1. who funded it
+2. what creative was approved
+3. which owner accepted it
+4. which kit was generated
+5. which QR or NFC identity was assigned
+6. what proof was submitted
+7. whether the proof was approved
+8. how many scans or taps occurred
+9. whether reward release is eligible
+10. what audit trail exists
+
+## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
-
-# Build for production
 npm run build
-
-# Preview production build
 npm run preview
 ```
 
-## Safety & Compliance
+## Safety and compliance
 
-- Never displays private keys or seed phrases
-- Public ledger shows only hashes, timestamps, and consented metadata
-- Raw KYC documents are never shown in public UI
-- Raw private memories are never posted onchain
-- All payment/reward logic is configurable and contract-dependent
+- Never display private keys or seed phrases.
+- Public proof views should show hashes, timestamps, campaign-safe metadata, and consented public data only.
+- Raw identity documents, private user data, and sensitive owner details must not be exposed in public UI.
+- Campaign results should be reported as analytics, not guaranteed performance.
 
-## Core Doctrine
+## Current stage
 
-Human Input → LLM Structuring → Notary / KYC Bridge → Artifact Hash → GitHub / IPFS Ledger → Personal Chain → Cross-Chain Monetization → Funded Payout
-
-## License
-
-Proprietary - MEMBRA HUMAN CHAIN
+Strong React/Vite visual foundation. Next step: replace static dashboard data with API-backed MEMBRA Ads, ProofBook, Wallet, Relay, and KPI data.
