@@ -1,67 +1,91 @@
 # MEMBRA QR Gateway
 
-MEMBRA QR Gateway is the premium dashboard and tracking interface for the MEMBRA ecosystem.
+**MEMBRA QR Gateway is the buyer-visible dashboard and QR/NFC interface for MEMBRA Labs and the MEMBRA Proof Network.**
 
-It provides the visual command center for QR/NFC proof media, artifact ledgers, owner dashboards, advertiser dashboards, scan events, reward status, payout readiness, proof review, wallet boundaries, analytics, and trust signals.
+It presents proof activity, public wallet surfaces, artifact provenance, QR/NFC media, scan/tap activity, KPI cards, and dashboard views for physical-world monetization workflows.
 
-## One-line thesis
+## Company Context
+
+- Company: **MEMBRA Labs**
+- Flagship product: **MEMBRA Proof Network**
+- Module: **MEMBRA QR Gateway**
+- Category: React dashboard, QR/NFC interface, provenance UI, proof-commerce visibility layer
+
+## One-Line Thesis
 
 MEMBRA QR Gateway turns QR/NFC interactions into visible proof, attribution, analytics, and monetizable campaign intelligence.
 
-## Product role
+## Product Role
 
-This repository is the frontend and command-center layer for:
+The QR Gateway is the visual command center for MEMBRA Proof Network.
 
-- MEMBRA Ads
-- MEMBRA Wear
-- MEMBRA Relay
-- MEMBRA Wallet
-- MEMBRA KPI
-- ProofBook records
-- QR/NFC scan attribution
-- owner and advertiser reporting
+It should show:
 
-## Core modules
-
-- campaign overview
-- owner inventory dashboard
-- advertiser campaign dashboard
-- QR/NFC scan console
-- ProofBook ledger view
-- payout and reward status
-- trust center
+- campaign proof status
+- QR/NFC identifiers
+- scan/tap activity
+- wallet/payment boundary status
 - artifact provenance
-- wallet status panel
-- analytics charts
-- mobile preview
+- owner/campaign/report panels
+- live event logs
+- KPI cards
+- mobile preview states
+- reward eligibility and payout readiness
 
-## Existing UI foundation
+## Current Repository Contents
 
-The app uses React, Vite, Tailwind-style components, Lucide icons, glassmorphic dashboard cards, QR-oriented visual language, wallet panels, proof lifecycle concepts, inventory screens, payout views, and trust-center navigation.
+- React/Vite frontend package
+- Tailwind-style dashboard UI direction
+- QR/provenance/product dashboard concept
+- KPI cards and event-stream visual concept
+- wallet panels and proof lifecycle concepts
+- owner, advertiser, payout, and trust-center navigation concepts
 
-## MEMBRA Ads integration
+## Installation
 
-QR Gateway should display:
+```bash
+npm install
+npm run dev
+```
 
-- campaigns
-- media kits
-- QR IDs
-- NFC IDs
-- proof events
-- scan events
-- owner placements
-- advertiser reports
-- kit delivery status
-- reward eligibility
-- claims and disputes
+Build:
 
-## QR/NFC law
+```bash
+npm run build
+npm run preview
+```
 
-Every QR or NFC tag must route through Membra first.
+## Integration Path
+
+The dashboard should consume APIs from:
+
+| Repo | Data source |
+|---|---|
+| `Membra_ads` | owners, advertisers, campaigns, media kits, proof events, QR/NFC scans |
+| `Membra_kpi` | owner, advertiser, campaign, proof, and investor metrics |
+| `Membra_wallet` | funding status, reward eligibility, payout state, wallet handoff links |
+| `Membra_proofbook` | hash records, proof ledger entries, verified reports |
+| `Membra_demo_data` | seeded demo scenarios for buyer walkthroughs |
+
+## Product Demo Target
+
+The dashboard should make this flow visible:
+
+1. campaign created
+2. QR/NFC kit generated
+3. proof submitted
+4. proof reviewed
+5. scan/tap recorded
+6. payout eligibility updated
+7. KPI report generated
+
+## QR/NFC Law
+
+Every QR or NFC tag must route through MEMBRA first.
 
 Direct advertiser URLs break attribution, fraud checks, analytics, proof reporting, and reward eligibility.
 
-## Dashboard doctrine
+## Dashboard Doctrine
 
 A campaign is not real until the dashboard can show:
 
@@ -76,22 +100,28 @@ A campaign is not real until the dashboard can show:
 9. whether reward release is eligible
 10. what audit trail exists
 
-## Development
+## Design System
 
-```bash
-npm install
-npm run dev
-npm run build
-npm run preview
-```
+Recommended company visual language:
 
-## Safety and compliance
+- dark charcoal background
+- orange/gold/bronze highlights
+- glassmorphic proof cards
+- thin borders
+- QR/NFC-centered artifact cards
+- audit-log panels
+- mobile preview frame
+- investor-grade KPI surfaces
 
-- Never display private keys or seed phrases.
-- Public proof views should show hashes, timestamps, campaign-safe metadata, and consented public data only.
-- Raw identity documents, private user data, and sensitive owner details must not be exposed in public UI.
-- Campaign results should be reported as analytics, not guaranteed performance.
+## Safety Rules
 
-## Current stage
+- never display private keys or seed phrases
+- never expose raw KYC documents
+- never expose private memories or private user data
+- show only consented metadata, hashes, timestamps, and proof states
+- clearly distinguish demo data from live customer data
+- report campaign analytics, not guaranteed advertiser performance
 
-Strong React/Vite visual foundation. Next step: replace static dashboard data with API-backed MEMBRA Ads, ProofBook, Wallet, Relay, and KPI data.
+## Status
+
+Frontend prototype package. Highest priority is connecting it to `Membra_ads` and `Membra_demo_data` to create a clean buyer-facing demo.
