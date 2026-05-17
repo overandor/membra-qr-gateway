@@ -61,16 +61,19 @@ jobs:
         working-directory: protocol
         run: anchor keys sync
 
-      - name: Upload IDLs
+      - name: Upload IDLs and types
         uses: actions/upload-artifact@v4
         with:
-          name: idls
-          path: protocol/target/idl/
+          name: anchor-artifacts
+          path: |
+            protocol/target/idl/
+            protocol/target/types/
 
   # ── TypeScript type-check ────────────────────────────────────────────────
   typecheck:
     name: tsc --noEmit
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - uses: actions/checkout@v4
 
@@ -83,6 +86,12 @@ jobs:
       - name: Install dependencies
         working-directory: protocol
         run: npm ci
+
+      - name: Download Anchor artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: anchor-artifacts
+          path: protocol/target/
 
       - name: Type-check SDK and tests
         working-directory: protocol
@@ -135,11 +144,11 @@ jobs:
         working-directory: protocol
         run: npm ci
 
-      - name: Download IDLs
+      - name: Download Anchor artifacts
         uses: actions/download-artifact@v4
         with:
-          name: idls
-          path: protocol/target/idl/
+          name: anchor-artifacts
+          path: protocol/target/
 
       - name: Run all tests
         working-directory: protocol
@@ -160,7 +169,10 @@ jobs:
 
       - name: Audit dependencies
         working-directory: protocol
-        run: cargo audit
+        # RUSTSEC-2024-0344 (curve25519-dalek 3.x) and RUSTSEC-2022-0093
+        # (ed25519-dalek 1.x) are transitive deps of solana-sdk 1.18.26 and
+        # cannot be upgraded without breaking Anchor 0.29 compatibility.
+        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0093
 
   # ── Lint ─────────────────────────────────────────────────────────────────
   lint:
@@ -186,4 +198,6 @@ jobs:
 
       - name: Clippy — deny warnings
         working-directory: protocol
-        run: cargo clippy --workspace -- -D warnings
+        # -A unexpected_cfgs suppresses false-positive warnings emitted by
+        # Anchor 0.29 macro expansions (cfg(feature="custom-heap") etc.)
+        run: cargo clippy --workspace -- -D warnings -A unexpected_cfgs

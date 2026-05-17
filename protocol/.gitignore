@@ -2,5 +2,3 @@ target/
 node_modules/
 .anchor/
 test-ledger/
-Cargo.lock
-protocol/target

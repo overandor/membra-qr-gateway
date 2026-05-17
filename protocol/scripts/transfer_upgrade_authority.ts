@@ -14,12 +14,7 @@
  */
 
 import * as anchor from "@coral-xyz/anchor";
-import {
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  BpfLoaderUpgradeable,
-} from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 
 const PROGRAM_IDS = {
   membra_ido: process.env.MEMBRA_IDO_PROGRAM_ID ?? "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",

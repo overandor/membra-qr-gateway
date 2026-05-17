@@ -171,7 +171,7 @@ describe("membra_ido", () => {
       .signers([authority])
       .rpc();
 
-    const config = await program.account.idoConfig.fetch(idoConfigPda);
+    const config = await program.account.idoConfig.fetch(idoConfigPda) as any;
     expect(config.tokenPriceUsd6.toNumber()).to.equal(TOKEN_PRICE_USD_6.toNumber());
     expect(config.hardCapTokens.toString()).to.equal(HARD_CAP_TOKENS.toString());
     expect(config.finalized).to.be.false;
@@ -380,12 +380,12 @@ describe("membra_ido", () => {
       .signers([buyer1])
       .rpc();
 
-    const record = await program.account.userIdoRecord.fetch(userIdoRecord);
+    const record = await program.account.userIdoRecord.fetch(userIdoRecord) as any;
     expect(record.tokensPurchased.toString()).to.equal(purchaseAmount.toString());
     expect(record.tokensClaimed).to.be.false;
     expect(record.refunded).to.be.false;
 
-    const config = await program.account.idoConfig.fetch(activeIdoConfig);
+    const config = await program.account.idoConfig.fetch(activeIdoConfig) as any;
     expect(config.totalSoldTokens.toString()).to.equal(purchaseAmount.toString());
   });
 
@@ -496,7 +496,7 @@ describe("membra_ido", () => {
       .signers([authority])
       .rpc();
 
-    let config = await program.account.idoConfig.fetch(activeIdoConfig);
+    let config = await program.account.idoConfig.fetch(activeIdoConfig) as any;
     expect(config.paused).to.be.true;
 
     await program.methods
@@ -508,7 +508,7 @@ describe("membra_ido", () => {
       .signers([authority])
       .rpc();
 
-    config = await program.account.idoConfig.fetch(activeIdoConfig);
+    config = await program.account.idoConfig.fetch(activeIdoConfig) as any;
     expect(config.paused).to.be.false;
   });
 
@@ -633,7 +633,7 @@ describe("membra_ido", () => {
       .signers([authority])
       .rpc();
 
-    const config = await program.account.idoConfig.fetch(cancelConfig);
+    const config = await program.account.idoConfig.fetch(cancelConfig) as any;
     expect(config.cancelled).to.be.true;
   });
 
