@@ -68,6 +68,14 @@ pub fn handler(
 ) -> Result<()> {
     require!(emission_rate_per_second > 0, RewardsError::InvalidEmissionRate);
     require!(reward_pool_cap > 0, RewardsError::InvalidAmount);
+    require!(
+        ctx.accounts.governance.key() != Pubkey::default(),
+        RewardsError::Unauthorized
+    );
+    require!(
+        ctx.accounts.penalty_destination.key() != Pubkey::default(),
+        RewardsError::InvalidPenaltyDestination
+    );
 
     let now = Clock::get()?.unix_timestamp;
     let pool = &mut ctx.accounts.rewards_pool;

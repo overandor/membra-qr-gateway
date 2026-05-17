@@ -1,0 +1,203 @@
+name: Protocol CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "protocol/**"
+  pull_request:
+    paths:
+      - "protocol/**"
+
+env:
+  ANCHOR_VERSION: "0.29.0"
+  SOLANA_VERSION: "1.18.26"
+  NODE_VERSION: "20"
+  RUST_TOOLCHAIN: "1.75.0"
+
+jobs:
+  # ── Rust / Anchor build ──────────────────────────────────────────────────
+  build:
+    name: anchor build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            protocol/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install ${{ env.ANCHOR_VERSION }}
+          avm use ${{ env.ANCHOR_VERSION }}
+          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+
+      - name: Create test keypair
+        run: solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+
+      - name: Build programs
+        working-directory: protocol
+        run: anchor build
+
+      - name: Sync program keys
+        working-directory: protocol
+        run: anchor keys sync
+
+      - name: Upload IDLs and types
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-artifacts
+          path: |
+            protocol/target/idl/
+            protocol/target/types/
+
+  # ── TypeScript type-check ────────────────────────────────────────────────
+  typecheck:
+    name: tsc --noEmit
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: protocol/package-lock.json
+
+      - name: Install dependencies
+        working-directory: protocol
+        run: npm ci
+
+      - name: Download Anchor artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: anchor-artifacts
+          path: protocol/target/
+
+      - name: Type-check SDK and tests
+        working-directory: protocol
+        run: npx tsc --noEmit
+
+  # ── Integration tests ────────────────────────────────────────────────────
+  test:
+    name: anchor test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            protocol/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/Cargo.lock') }}
+
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install ${{ env.ANCHOR_VERSION }}
+          avm use ${{ env.ANCHOR_VERSION }}
+          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: protocol/package-lock.json
+
+      - name: Create test keypair
+        run: solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+
+      - name: Install Node dependencies
+        working-directory: protocol
+        run: npm ci
+
+      - name: Download Anchor artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: anchor-artifacts
+          path: protocol/target/
+
+      - name: Run all tests
+        working-directory: protocol
+        run: anchor test --skip-build
+        env:
+          ANCHOR_PROVIDER_URL: http://127.0.0.1:8899
+          ANCHOR_WALLET: ~/.config/solana/id.json
+
+  # ── Security scan ────────────────────────────────────────────────────────
+  security:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Audit dependencies
+        working-directory: protocol
+        # RUSTSEC-2024-0344 (curve25519-dalek 3.x) and RUSTSEC-2022-0093
+        # (ed25519-dalek 1.x) are transitive deps of solana-sdk 1.18.26 and
+        # cannot be upgraded without breaking Anchor 0.29 compatibility.
+        run: cargo audit --ignore RUSTSEC-2024-0344 --ignore RUSTSEC-2022-0093
+
+  # ── Lint ─────────────────────────────────────────────────────────────────
+  lint:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            protocol/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/Cargo.lock') }}
+
+      - name: Clippy — deny warnings
+        working-directory: protocol
+        # -A unexpected_cfgs suppresses false-positive warnings emitted by
+        # Anchor 0.29 macro expansions (cfg(feature="custom-heap") etc.)
+        run: cargo clippy --workspace -- -D warnings -A unexpected_cfgs

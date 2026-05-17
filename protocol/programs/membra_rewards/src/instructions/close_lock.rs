@@ -51,9 +51,10 @@ pub struct CloseLock<'info> {
     /// LockRecord PDA being closed.
     #[account(
         mut,
-        constraint = lock_record.user == user.key() @ RewardsError::Unauthorized,
-        constraint = lock_record.rewards_pool == rewards_pool.key() @ RewardsError::Unauthorized,
+        has_one = user @ RewardsError::Unauthorized,
+        has_one = rewards_pool @ RewardsError::Unauthorized,
         constraint = !lock_record.closed @ RewardsError::LockAlreadyClosed,
+        close = user,
     )]
     pub lock_record: Account<'info, LockRecord>,
 
@@ -139,8 +140,9 @@ pub fn handler(ctx: Context<CloseLock>) -> Result<()> {
         token::transfer(user_ctx, user_receives)?;
     }
 
-    // Mark the record as closed.
-    lock_record.closed = true;
+    // Note: `close = user` in the account constraint closes the account and
+    // recovers rent automatically at instruction end.  No need to set
+    // lock_record.closed = true here.
 
     emit!(LockClosed {
         user: ctx.accounts.user.key(),

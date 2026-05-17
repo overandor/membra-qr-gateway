@@ -100,6 +100,12 @@ pub fn handler(ctx: Context<FinalizeIdo>) -> Result<()> {
             );
             token::burn(burn_ctx, unsold_tokens)?;
         } else {
+            // Validate treasury_token_account belongs to the configured treasury
+            require!(
+                ctx.accounts.treasury_token_account.owner == ctx.accounts.ido_config.treasury,
+                IdoError::InvalidVault
+            );
+
             // Transfer unsold tokens to treasury.
             let transfer_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),

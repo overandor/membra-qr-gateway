@@ -1,4 +1,5 @@
 pub mod buy_ido;
+pub mod cancel_ido;
 pub mod claim_ido_tokens;
 pub mod finalize_ido;
 pub mod initialize_ido;
@@ -9,6 +10,7 @@ pub mod refund_ido;
 // share the same name across modules and would produce ambiguous glob re-exports.
 // lib.rs calls handlers via their fully-qualified module path.
 pub use buy_ido::BuyIdo;
+pub use cancel_ido::CancelIdo;
 pub use claim_ido_tokens::ClaimIdoTokens;
 pub use finalize_ido::FinalizeIdo;
 pub use initialize_ido::InitializeIdo;
