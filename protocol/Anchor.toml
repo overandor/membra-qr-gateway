@@ -1,0 +1,25 @@
+[features]
+seeds = true
+skip-lint = false
+
+[programs.localnet]
+membra_ido = "MiDoFg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPF"
+membra_rebase = "MrBs5yBsSqwBFUEdbLNwg4RiNLjPQqFDfC4M8vrKKVfFU"
+membra_rewards = "MrWd8mFGRpQSKSBMxQRCmPfyZT73E9VqxEECeqkxdbv4"
+membra_governance = "MgOvBrjFLmpnAkbNEfBSdFHFvQE1wNrVzfRqMv1Y4yJF"
+
+[programs.devnet]
+membra_ido = "MiDoFg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPF"
+membra_rebase = "MrBs5yBsSqwBFUEdbLNwg4RiNLjPQqFDfC4M8vrKKVfFU"
+membra_rewards = "MrWd8mFGRpQSKSBMxQRCmPfyZT73E9VqxEECeqkxdbv4"
+membra_governance = "MgOvBrjFLmpnAkbNEfBSdFHFvQE1wNrVzfRqMv1Y4yJF"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

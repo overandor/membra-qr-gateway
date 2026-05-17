@@ -1,0 +1,30 @@
+{
+  "name": "membra-money-protocol",
+  "version": "0.1.0",
+  "description": "MEMBRA Money Protocol – elastic-supply Solana IDO, rebase, staking, and governance",
+  "scripts": {
+    "build": "anchor build",
+    "test": "anchor test",
+    "test:ido": "ts-mocha -p ./tsconfig.json -t 1000000 tests/membra_ido.ts",
+    "test:rebase": "ts-mocha -p ./tsconfig.json -t 1000000 tests/membra_rebase.ts",
+    "test:rewards": "ts-mocha -p ./tsconfig.json -t 1000000 tests/membra_rewards.ts",
+    "test:governance": "ts-mocha -p ./tsconfig.json -t 1000000 tests/membra_governance.ts",
+    "localnet": "solana-test-validator --reset",
+    "deploy:localnet": "bash scripts/deploy_localnet.sh",
+    "deploy:devnet": "bash scripts/deploy_devnet.sh"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.29.0",
+    "@solana/spl-token": "^0.4.0",
+    "@solana/web3.js": "^1.95.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "chai": "^4.3.7",
+    "mocha": "^10.3.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.3.0"
+  }
+}
