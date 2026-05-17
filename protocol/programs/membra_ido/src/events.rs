@@ -51,3 +51,11 @@ pub struct IdoResumed {
     pub authority: Pubkey,
     pub ts: i64,
 }
+
+#[event]
+pub struct IdoCancelled {
+    pub authority: Pubkey,
+    pub total_sold_tokens: u64,
+    pub total_raised_payment: u64,
+    pub ts: i64,
+}

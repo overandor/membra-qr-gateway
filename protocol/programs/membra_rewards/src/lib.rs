@@ -138,4 +138,16 @@ pub mod membra_rewards {
     pub fn close_lock(ctx: Context<CloseLock>) -> Result<()> {
         close_lock::handler(ctx)
     }
+
+    // -----------------------------------------------------------------------
+    // close_stake_account
+    // -----------------------------------------------------------------------
+
+    /// Close a fully unstaked [`UserStakeAccount`] and recover rent.
+    ///
+    /// Only callable when `staked_amount == 0` and `pending_rewards == 0`.
+    /// The account is closed and rent lamports are returned to the user.
+    pub fn close_stake_account(ctx: Context<CloseStakeAccount>) -> Result<()> {
+        close_stake_account::handler(ctx)
+    }
 }

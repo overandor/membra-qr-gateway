@@ -90,6 +90,16 @@ pub fn handler(
     require!(end_ts > now, IdoError::InvalidTimestamp);
     require!(claim_start_ts >= end_ts, IdoError::InvalidTimestamp);
 
+    // Treasury and governance must not be the default pubkey
+    require!(
+        ctx.accounts.treasury.key() != Pubkey::default(),
+        IdoError::InvalidVault
+    );
+    require!(
+        ctx.accounts.governance.key() != Pubkey::default(),
+        IdoError::Unauthorized
+    );
+
     let config = &mut ctx.accounts.ido_config;
     let bump = ctx.bumps.ido_config;
 
