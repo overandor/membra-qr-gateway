@@ -76,6 +76,12 @@ pub mod membra_rebase {
         instructions::update_pyth_price::handler(ctx)
     }
 
+    /// Update oracle price directly from the Switchboard V2 aggregator feed account.
+    /// Permissionless — any keeper can call when oracle_source == 1 (Switchboard).
+    pub fn update_switchboard_price(ctx: Context<UpdateSwitchboardPrice>) -> Result<()> {
+        instructions::update_switchboard_price::handler(ctx)
+    }
+
     /// Push a new price observation into `RebaseState`.
     ///
     /// The caller must be the `authority`.  For Manual oracle source the price is
