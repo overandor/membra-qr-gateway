@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { 
+import { EarlyRiskCurveFlow } from './components/tokenomics/EarlyRiskCurveFlow';
+import {
   LayoutDashboard, 
   Lightbulb, 
   Box, 
@@ -2555,6 +2556,7 @@ function App() {
               MEMBRA Doctrine Stack
             </h3>
 
+            <EarlyRiskCurveFlow />
             <ValueStateMachine />
             <QRWorkflowFlow />
             <TokenLaunchStateMachine />
