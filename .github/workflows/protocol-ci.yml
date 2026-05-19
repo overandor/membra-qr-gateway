@@ -43,12 +43,16 @@ jobs:
           sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
+      - name: Cache Anchor CLI binary
+        id: cache-anchor-build
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/anchor
+          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}
+
       - name: Install Anchor CLI
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          avm install ${{ env.ANCHOR_VERSION }}
-          avm use ${{ env.ANCHOR_VERSION }}
-          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+        if: steps.cache-anchor-build.outputs.cache-hit != 'true'
+        run: cargo install anchor-cli --version ${{ env.ANCHOR_VERSION }} --locked
 
       - name: Create test keypair
         run: solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
@@ -124,12 +128,16 @@ jobs:
           sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
+      - name: Cache Anchor CLI binary
+        id: cache-anchor-test
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/anchor
+          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}
+
       - name: Install Anchor CLI
-        run: |
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          avm install ${{ env.ANCHOR_VERSION }}
-          avm use ${{ env.ANCHOR_VERSION }}
-          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+        if: steps.cache-anchor-test.outputs.cache-hit != 'true'
+        run: cargo install anchor-cli --version ${{ env.ANCHOR_VERSION }} --locked
 
       - uses: actions/setup-node@v4
         with:

@@ -66,6 +66,7 @@ pub struct InitializeIdo<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn handler(
     ctx: Context<InitializeIdo>,
     token_price_usd_6: u64,
