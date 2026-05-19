@@ -35,7 +35,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             protocol/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/**/Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Install Solana CLI
@@ -121,7 +121,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             protocol/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/**/Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/Cargo.lock') }}
 
       - name: Install Solana CLI
         run: |
@@ -202,7 +202,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             protocol/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/**/Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/Cargo.lock') }}
 
       - name: Clippy — deny warnings
         working-directory: protocol
