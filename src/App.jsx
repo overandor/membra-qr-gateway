@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LandingPage } from './components/landing/LandingPage';
 import { EarlyRiskCurveFlow } from './components/tokenomics/EarlyRiskCurveFlow';
 import { TokenSaleLive } from './components/tokenomics/TokenSaleLive';
 import { LLMInferencePanel } from './components/llm/LLMInferencePanel';
@@ -32,6 +33,7 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowRight,
+  ArrowLeft,
   Layers,
   Cpu,
   Network,
@@ -2411,6 +2413,7 @@ const FooterCard = ({ card }) => {
 };
 
 function App() {
+  const [showLanding, setShowLanding] = useState(true);
   const [activeNav, setActiveNav] = useState('Overview');
   const [health, setHealth] = useState(null);
   const [liveArtifacts, setLiveArtifacts] = useState([]);
@@ -2441,6 +2444,17 @@ function App() {
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
+  if (showLanding) {
+    return (
+      <LandingPage
+        onEnterApp={() => setShowLanding(false)}
+        health={health}
+        artifacts={liveArtifacts}
+        events={liveEvents}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg-dark)]">
       {/* Header */}
@@ -2459,11 +2473,17 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button className="px-4 py-2 rounded-lg bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/30 text-[var(--accent-orange)] text-sm font-medium hover:bg-[var(--accent-orange)]/20 transition-colors">
-                Create Artifact
+              <button
+                onClick={() => setShowLanding(true)}
+                className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[var(--text-muted)] text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-1"
+              >
+                <ArrowLeft className="w-4 h-4" /> Landing
               </button>
-              <button className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-[var(--text-muted)] text-sm font-medium hover:bg-white/10 transition-colors">
-                Hash & Anchor
+              <button
+                onClick={() => setActiveNav('Artifacts')}
+                className="px-4 py-2 rounded-lg bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/30 text-[var(--accent-orange)] text-sm font-medium hover:bg-[var(--accent-orange)]/20 transition-colors"
+              >
+                Create Artifact
               </button>
             </div>
           </div>

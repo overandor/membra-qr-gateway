@@ -7,12 +7,16 @@ membra_ido = "MiDoFg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPF"
 membra_rebase = "MrBs5yBsSqwBFUEdbLNwg4RiNLjPQqFDfC4M8vrKKVfFU"
 membra_rewards = "MrWd8mFGRpQSKSBMxQRCmPfyZT73E9VqxEECeqkxdbv4"
 membra_governance = "MgOvBrjFLmpnAkbNEfBSdFHFvQE1wNrVzfRqMv1Y4yJF"
+membra_mmce = "MmCe111111111111111111111111111111111111111"
+membra_llm = "MlLm111111111111111111111111111111111111111"
 
 [programs.devnet]
 membra_ido = "MiDoFg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPF"
 membra_rebase = "MrBs5yBsSqwBFUEdbLNwg4RiNLjPQqFDfC4M8vrKKVfFU"
 membra_rewards = "MrWd8mFGRpQSKSBMxQRCmPfyZT73E9VqxEECeqkxdbv4"
 membra_governance = "MgOvBrjFLmpnAkbNEfBSdFHFvQE1wNrVzfRqMv1Y4yJF"
+membra_mmce = "MmCe111111111111111111111111111111111111111"
+membra_llm = "MlLm111111111111111111111111111111111111111"
 
 [registry]
 url = "https://api.apr.dev"
