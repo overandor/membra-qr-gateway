@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EarlyRiskCurveFlow } from './components/tokenomics/EarlyRiskCurveFlow';
 import { LLMInferencePanel } from './components/llm/LLMInferencePanel';
+import { Overview } from './components/dashboard/Overview';
 import { api } from './services/api';
 import {
   LayoutDashboard, 
@@ -2578,6 +2579,8 @@ function App() {
           </h2>
           <LLMInferencePanel liveArtifacts={liveArtifacts} liveEvents={liveEvents} liveSales={liveSales} health={health} />
         </div>
+      ) : activeNav === 'Overview' ? (
+        <Overview />
       ) : (
         <>
           {/* Three State Machines */}
