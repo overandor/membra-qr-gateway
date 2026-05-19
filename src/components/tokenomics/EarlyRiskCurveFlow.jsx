@@ -1,104 +1,51 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   QrCode, Wallet, AlertTriangle, Coins, Receipt,
   TrendingUp, Shield, Zap, CheckCircle, ArrowRight,
   Activity, Users, Lock, Copy, ChevronDown, ChevronUp,
-  RefreshCw, Clock, BarChart2,
+  RefreshCw, Clock, BarChart2, Plus, Loader2,
 } from 'lucide-react';
 import { cn } from '../../utils';
+import { api } from '../../services/api';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const SOL_USD_RATE   = 150;
-const DENOMINATION   = 0.10;   // $0.10 — base denomination (10 cents)
-const MARKET_MIN     = 0.10;   // floor
-const MARKET_MAX     = 1.00;   // ceiling
-const REBASE_EVERY_S = 3 * 60 * 60; // 3 hours in seconds
-const REBASE_PCT     = 0.03;   // 3 % of holders selected per epoch
+const DENOMINATION   = 0.10;
+const MARKET_MIN     = 0.10;
+const MARKET_MAX     = 1.00;
+const REBASE_EVERY_S = 3 * 60 * 60;
+const REBASE_PCT     = 0.03;
 
-const SALE_STATE = {
-  maxSupply:         10_000_000,
-  initialPrice:      DENOMINATION,   // IDO starts at $0.10
-  maxBonusPct:       0.50,
-  decayLambda:       3.0,
-  totalSold:         1_485_000,
-  totalRaised:       148_500,        // 1.485M tokens × $0.10
-  rewardPoolBalance: 7_425,          // 5 % of raised
-  position:          847,
-  holderCount:       312,
-  status:            'active',
+const DEFAULT_SALE_PARAMS = {
+  name: 'MEMBRA QR Token',
+  symbol: 'MQRT',
+  maxSupply: 10_000_000,
+  initialPrice: DENOMINATION,
+  maxBonusPct: 0.50,
+  decayLambda: 3.0,
 };
 
-// ── Seed of deterministic "past" epochs ──────────────────────────────────────
-function seededRand(seed) {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-}
-
-function buildEpochHistory(count = 8) {
-  const rand = seededRand(42);
-  let supply = SALE_STATE.totalSold;
-  const epochs = [];
-  for (let i = count; i >= 1; i--) {
-    const marketPrice = MARKET_MIN + rand() * (MARKET_MAX - MARKET_MIN);
-    const factor      = marketPrice / DENOMINATION;
-    const holders     = Math.round(SALE_STATE.holderCount * (0.6 + i * 0.05));
-    const holderMult  = 1 + (holders / 5000) * 0.4;
-    const selected    = Math.max(1, Math.round(holders * REBASE_PCT));
-    const avgBal      = supply / holders;
-    const bonus       = avgBal * (factor - 1) * holderMult * selected;
-    supply += bonus;
-    epochs.push({
-      epoch: count - i + 1,
-      marketPrice,
-      factor,
-      holders,
-      selected,
-      holderMult,
-      bonusIssued: bonus,
-      totalSupply: supply,
-    });
-  }
-  return epochs;
-}
-
-const EPOCH_HISTORY = buildEpochHistory(8);
-const INITIAL_SUPPLY = EPOCH_HISTORY[EPOCH_HISTORY.length - 1].totalSupply;
-
 // ── Math helpers ─────────────────────────────────────────────────────────────
-function curvePrice(totalSold) {
-  const s = totalSold / SALE_STATE.maxSupply;
+function curvePrice(totalSold, maxSupply) {
+  const s = maxSupply > 0 ? totalSold / maxSupply : 0;
   return DENOMINATION * (1 + s);
 }
 
-function earlyBonusPct(totalSold) {
-  const s = totalSold / SALE_STATE.maxSupply;
-  return SALE_STATE.maxBonusPct * Math.exp(-SALE_STATE.decayLambda * s);
+function earlyBonusPct(totalSold, maxSupply, maxBonusPct, decayLambda) {
+  const s = maxSupply > 0 ? totalSold / maxSupply : 0;
+  return maxBonusPct * Math.exp(-decayLambda * s);
 }
 
-// Holder count amplifies the rebase bonus
 function holderMultiplier(holderCount) {
   return 1 + (holderCount / 5000) * 0.4;
 }
 
-// Bonus tokens a selected holder receives this epoch
-function rebaseBonusForHolder(balance, marketPrice, holderCount) {
-  const factor = marketPrice / DENOMINATION;
-  const mult   = holderMultiplier(holderCount);
-  return balance * (factor - 1) * mult;
+function buildCurvePoints(maxSupply, maxBonusPct, decayLambda) {
+  return Array.from({ length: 11 }, (_, i) => {
+    const s = i / 10;
+    return { s, price: DENOMINATION * (1 + s), bonus: maxBonusPct * Math.exp(-decayLambda * s) };
+  });
 }
-
-// ── Static derived values ────────────────────────────────────────────────────
-const CURVE_POINTS = Array.from({ length: 11 }, (_, i) => {
-  const s = i / 10;
-  return {
-    s,
-    price: DENOMINATION * (1 + s),
-    bonus: SALE_STATE.maxBonusPct * Math.exp(-SALE_STATE.decayLambda * s),
-  };
-});
 
 const FLOW_STEPS = [
   { icon: QrCode,        label: 'QR Created',       desc: 'Artifact registered on-chain with consent hash',      status: 'complete' },
@@ -123,8 +70,7 @@ const SPLIT_SLICES = [
 ];
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-function MiniBarChart({ points, valueKey, maxValue, activeColor, label }) {
-  const supplyFraction = SALE_STATE.totalSold / SALE_STATE.maxSupply;
+function MiniBarChart({ points, valueKey, maxValue, activeColor, label, supplyFraction }) {
   return (
     <div className="p-4 rounded-xl bg-background-100 border border-white/5">
       <p className="text-[10px] text-text-muted mb-3">{label}</p>
@@ -170,25 +116,27 @@ export function EarlyRiskCurveFlow() {
   const [expandedStep,    setExpandedStep]    = useState(null);
   const [claimSubmitted,  setClaimSubmitted]  = useState(false);
   const [copied,          setCopied]          = useState(false);
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState('');
+
+  // Live sale state
+  const [sale,            setSale]            = useState(null);
+  const [saleLoading,     setSaleLoading]     = useState(true);
+  const [contributionResult, setContributionResult] = useState(null);
+  const [buyerWallet,     setBuyerWallet]     = useState('');
 
   // Rebase epoch state
   const [marketPrice,     setMarketPrice]     = useState(0.42);
-  const [holderCount,     setHolderCount]     = useState(SALE_STATE.holderCount);
-  const [totalSupply,     setTotalSupply]     = useState(INITIAL_SUPPLY);
-  const [epochHistory,    setEpochHistory]    = useState(EPOCH_HISTORY);
-  const [nextRebaseSecs,  setNextRebaseSecs]  = useState(5_400); // 1.5 h demo
-  const [rebaseCount,     setRebaseCount]     = useState(EPOCH_HISTORY.length);
-  const [lastWinners,     setLastWinners]     = useState(() => {
-    const last = EPOCH_HISTORY[EPOCH_HISTORY.length - 1];
-    return Array.from({ length: last.selected }, (_, i) => ({
-      wallet: `${(i * 7 + 1337).toString(16).padStart(4, '0')}…${(i * 13).toString(16).padStart(4, '0')}`,
-      bonus:  last.bonusIssued / last.selected,
-    })).slice(0, 5);
-  });
+  const [holderCount,     setHolderCount]     = useState(0);
+  const [totalSupply,     setTotalSupply]     = useState(0);
+  const [epochHistory,    setEpochHistory]    = useState([]);
+  const [nextRebaseSecs,  setNextRebaseSecs]  = useState(REBASE_EVERY_S);
+  const [rebaseCount,     setRebaseCount]     = useState(0);
+  const [lastWinners,     setLastWinners]     = useState([]);
 
   // Countdown tick
   useEffect(() => {
-    const t = setInterval(() => setNextRebaseSecs((s) => (s > 0 ? s - 1 : 0)), 1000);
+    const t = setInterval(() => setNextRebaseSecs((s) => (s > 0 ? s - 1 : REBASE_EVERY_S)), 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -199,66 +147,173 @@ export function EarlyRiskCurveFlow() {
     return `${h}h ${String(m).padStart(2, '0')}m ${String(sec).padStart(2, '0')}s`;
   };
 
-  // Manual rebase trigger (demo)
-  const triggerRebase = useCallback(() => {
-    const newPrice   = MARKET_MIN + Math.random() * (MARKET_MAX - MARKET_MIN);
-    const factor     = newPrice / DENOMINATION;
-    const newHolders = holderCount + Math.floor(Math.random() * 8);
-    const mult       = holderMultiplier(newHolders);
-    const selected   = Math.max(1, Math.round(newHolders * REBASE_PCT));
-    const avgBal     = totalSupply / newHolders;
-    const bonus      = avgBal * (factor - 1) * mult * selected;
-    const newSupply  = totalSupply + bonus;
-    const newEpoch   = rebaseCount + 1;
+  // ── Fetch or create sale on mount ──────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    async function initSale() {
+      try {
+        setSaleLoading(true);
+        setError('');
+        const newSale = await api.createTokenSale({
+          ...DEFAULT_SALE_PARAMS,
+          creator_wallet: buyerWallet,
+        });
+        if (!cancelled) {
+          setSale(newSale);
+          setTotalSupply(0);
+          setHolderCount(1);
+          setRebaseCount(0);
+          setEpochHistory([]);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError('Backend unavailable. Start app.py on port 7860 to create a token sale.');
+        }
+      } finally {
+        if (!cancelled) setSaleLoading(false);
+      }
+    }
+    initSale();
+    return () => { cancelled = true; };
+  }, []);
 
-    setMarketPrice(newPrice);
-    setHolderCount(newHolders);
-    setTotalSupply(newSupply);
-    setRebaseCount(newEpoch);
-    setNextRebaseSecs(REBASE_EVERY_S);
-    setEpochHistory((prev) => [
-      ...prev,
-      { epoch: newEpoch, marketPrice: newPrice, factor, holders: newHolders,
-        selected, holderMult: mult, bonusIssued: bonus, totalSupply: newSupply },
-    ].slice(-10));
-    setLastWinners(
-      Array.from({ length: Math.min(selected, 5) }, (_, i) => ({
-        wallet: `${Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0')}…${Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0')}`,
-        bonus: bonus / selected,
-      }))
-    );
-  }, [holderCount, totalSupply, rebaseCount]);
+  // ── Poll rebase state when sale exists ─────────────────────────────────────
+  useEffect(() => {
+    if (!sale?.sale_id) return;
+    let cancelled = false;
+    async function pollRebase() {
+      try {
+        const state = await api.getRebaseState(sale.sale_id);
+        if (!cancelled && state) {
+          setMarketPrice(state.market_price || 0.42);
+          setHolderCount(state.holder_count || 1);
+          setTotalSupply(state.total_supply || 0);
+          setRebaseCount(state.epoch || 0);
+          if (state.last_winners) setLastWinners(state.last_winners.slice(0, 5));
+        }
+      } catch (_) {}
+      try {
+        const history = await api.getRebaseHistory(sale.sale_id, 10);
+        if (!cancelled && history?.epochs) setEpochHistory(history.epochs);
+      } catch (_) {}
+    }
+    pollRebase();
+    const interval = setInterval(pollRebase, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [sale?.sale_id]);
 
-  // ── Contribution math ───────────────────────────────────────────────────────
-  const supplyFraction = SALE_STATE.totalSold / SALE_STATE.maxSupply;
-  const currentPrice   = curvePrice(SALE_STATE.totalSold);
-  const bonusPct       = earlyBonusPct(SALE_STATE.totalSold);
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const maxSupply = sale?.maxSupply || DEFAULT_SALE_PARAMS.maxSupply;
+  const maxBonusPct = sale?.maxBonusPct || DEFAULT_SALE_PARAMS.maxBonusPct;
+  const decayLambda = sale?.decayLambda || DEFAULT_SALE_PARAMS.decayLambda;
+  const totalSold = sale?.totalSold || 0;
+  const totalRaised = sale?.totalRaised || 0;
+  const rewardPoolBalance = sale?.rewardPoolBalance || 0;
 
-  const amtNum      = Math.max(parseFloat(amount) || 0, 0);
-  const usdEq       = currency === 'SOL' ? amtNum * SOL_USD_RATE : amtNum;
-  const baseTokens  = usdEq / currentPrice;
-  const bonusTokens = baseTokens * bonusPct;
-  const totalTokens = baseTokens + bonusTokens;
+  const supplyFraction = maxSupply > 0 ? totalSold / maxSupply : 0;
+  const currentPrice   = curvePrice(totalSold, maxSupply);
+  const bonusPct       = earlyBonusPct(totalSold, maxSupply, maxBonusPct, decayLambda);
+  const curvePoints    = buildCurvePoints(maxSupply, maxBonusPct, decayLambda);
 
-  const splitAmounts = SPLIT_SLICES.map((s) => ({ ...s, amount: usdEq * (s.pct / 100) }));
-  const maxRebate    = Math.min(splitAmounts[3].amount, SALE_STATE.rewardPoolBalance * 0.01);
+  const amtNum      = useMemo(() => Math.max(parseFloat(amount) || 0, 0), [amount]);
+  const usdEq       = useMemo(() => (currency === 'SOL' ? amtNum * SOL_USD_RATE : amtNum), [currency, amtNum]);
+  const baseTokens  = useMemo(() => (currentPrice > 0 ? usdEq / currentPrice : 0), [usdEq, currentPrice]);
+  const bonusTokens = useMemo(() => baseTokens * bonusPct, [baseTokens, bonusPct]);
+  const totalTokens = useMemo(() => baseTokens + bonusTokens, [baseTokens, bonusTokens]);
+
+  const splitAmounts = useMemo(() => SPLIT_SLICES.map((s) => ({ ...s, amount: usdEq * (s.pct / 100) })), [usdEq]);
+  const maxRebate    = useMemo(() => Math.min(splitAmounts[3].amount, rewardPoolBalance * 0.01), [splitAmounts, rewardPoolBalance]);
 
   // Current rebase stats
   const rebaseFactor  = marketPrice / DENOMINATION;
   const hMult         = holderMultiplier(holderCount);
   const selected3pct  = Math.max(1, Math.round(holderCount * REBASE_PCT));
-  const avgHolderBal  = totalSupply / holderCount;
+  const avgHolderBal  = holderCount > 0 ? totalSupply / holderCount : 0;
   const epochBonus    = avgHolderBal * (rebaseFactor - 1) * hMult;
-  const maxEpochSupply = Math.max(...epochHistory.map((e) => e.totalSupply));
+  const maxEpochSupply = epochHistory.length > 0 ? Math.max(...epochHistory.map((e) => e.totalSupply)) : 1;
 
   function handleCopy() {
-    navigator.clipboard.writeText('a7f3c…2b1e').catch(() => {});
+    navigator.clipboard.writeText(contributionResult?.receiptHash || 'a7f3c…2b1e').catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
+  // ── Trigger rebase via API ─────────────────────────────────────────────────
+  const triggerRebase = useCallback(async () => {
+    if (!sale?.sale_id) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.triggerRebase({ sale_id: sale.sale_id });
+        setMarketPrice(result.market_price || marketPrice);
+        setHolderCount(result.holder_count || holderCount);
+        setTotalSupply(result.total_supply || totalSupply);
+        setRebaseCount(result.epoch || rebaseCount + 1);
+        setNextRebaseSecs(REBASE_EVERY_S);
+        if (result.winners) setLastWinners(result.winners.slice(0, 5));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sale, holderCount, totalSupply, rebaseCount, marketPrice]);
+
+  // ── Record contribution via API ────────────────────────────────────────────
+  const handleContribute = useCallback(async () => {
+    if (!sale?.sale_id || amtNum <= 0) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.recordContribution({
+        sale_id: sale.sale_id,
+        buyer_wallet: buyerWallet,
+        amount: amtNum,
+        currency,
+      });
+      setContributionResult(result);
+      const updated = await api.getTokenSale(sale.sale_id);
+      setSale(updated);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sale, amtNum, currency, buyerWallet, baseTokens, bonusTokens, totalTokens]);
+
+  // ── Submit claim via API ───────────────────────────────────────────────────
+  const handleClaim = useCallback(async () => {
+    if (!sale?.sale_id || !contributionResult) return;
+    setLoading(true);
+    setError('');
+    try {
+      await api.submitClaim({
+          sale_id: sale.sale_id,
+          buyer_wallet: buyerWallet,
+          contribution_id: contributionResult.receiptHash || contributionResult.position,
+        });
+        setClaimSubmitted(true);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sale, contributionResult, buyerWallet]);
+
   return (
     <div className="glass-card p-6 mb-6">
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-danger/10 border border-danger/30 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-danger flex-shrink-0" />
+          <p className="text-xs text-danger">{error}</p>
+        </div>
+      )}
+      {saleLoading && (
+        <div className="mb-4 p-3 rounded-xl bg-primary-orange/10 border border-primary-orange/30 flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-primary-orange animate-spin flex-shrink-0" />
+          <p className="text-xs text-primary-orange">Initializing token sale…</p>
+        </div>
+      )}
+
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xl font-semibold flex items-center gap-2">
@@ -332,9 +387,10 @@ export function EarlyRiskCurveFlow() {
           </h4>
           <button
             onClick={triggerRebase}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-gold/10 border border-primary-gold/30 text-primary-gold text-xs font-bold hover:bg-primary-gold/20 transition-colors"
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-gold/10 border border-primary-gold/30 text-primary-gold text-xs font-bold hover:bg-primary-gold/20 transition-colors disabled:opacity-50"
           >
-            <RefreshCw className="w-3 h-3" />
+            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             Simulate Next Epoch
           </button>
         </div>
@@ -442,11 +498,11 @@ export function EarlyRiskCurveFlow() {
             </div>
             <div className="p-3 rounded-lg bg-background-100 border border-primary-orange/10">
               <p className="text-[10px] text-text-muted mb-0.5">Total Raised</p>
-              <p className="text-sm font-bold text-text-primary">${SALE_STATE.totalRaised.toLocaleString()}</p>
+              <p className="text-sm font-bold text-text-primary">${totalRaised.toLocaleString()}</p>
             </div>
             <div className="p-3 rounded-lg bg-background-100 border border-primary-orange/10">
               <p className="text-[10px] text-text-muted mb-0.5">Tokens Sold</p>
-              <p className="text-sm font-bold text-text-primary">{(SALE_STATE.totalSold / 1_000).toFixed(0)}k</p>
+              <p className="text-sm font-bold text-text-primary">{(totalSold / 1_000).toFixed(0)}k</p>
             </div>
           </div>
 
@@ -494,6 +550,15 @@ export function EarlyRiskCurveFlow() {
             </div>
           </div>
 
+          <button
+            onClick={handleContribute}
+            disabled={loading || amtNum <= 0}
+            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-primary-orange to-primary-bronze text-white text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Coins className="w-4 h-4" />}
+            {contributionResult ? 'Contribute Again' : 'Record Contribution'}
+          </button>
+
           <div className="p-3 rounded-lg bg-danger/5 border border-danger/20">
             <p className="text-[10px] text-danger font-semibold mb-0.5">Not investment advice</p>
             <p className="text-[10px] text-text-muted">
@@ -507,11 +572,12 @@ export function EarlyRiskCurveFlow() {
           <h4 className="text-xs font-bold text-primary-orange uppercase tracking-wide">Bonding Curve + Decay</h4>
 
           <MiniBarChart
-            points={CURVE_POINTS}
+            points={curvePoints}
             valueKey="price"
-            maxValue={CURVE_POINTS[CURVE_POINTS.length - 1].price}
+            maxValue={curvePoints[curvePoints.length - 1].price}
             activeColor="bg-primary-orange"
             label="Price Curve — rises above $0.10 as supply fraction grows (▲ = now)"
+            supplyFraction={supplyFraction}
           />
 
           <div className="p-3 rounded-lg bg-background-100 border border-white/5 text-xs font-mono space-y-1">
@@ -522,11 +588,12 @@ export function EarlyRiskCurveFlow() {
           </div>
 
           <MiniBarChart
-            points={CURVE_POINTS}
+            points={curvePoints}
             valueKey="bonus"
-            maxValue={SALE_STATE.maxBonusPct}
+            maxValue={maxBonusPct}
             activeColor="bg-primary-gold"
             label="Early Bonus Decay — higher for earlier buyers (▲ = now)"
+            supplyFraction={supplyFraction}
           />
 
           <div className="p-3 rounded-lg bg-background-100 border border-white/5 text-xs font-mono space-y-1">
@@ -565,7 +632,7 @@ export function EarlyRiskCurveFlow() {
             </div>
             <div className="space-y-1.5">
               {[
-                { label: 'Buyer Position',  value: `#${SALE_STATE.position}`,    mono: true,  color: 'text-primary-orange' },
+                { label: 'Buyer Position',  value: contributionResult ? `#${contributionResult.position}` : '—',    mono: true,  color: 'text-primary-orange' },
                 { label: 'Total Tokens',    value: totalTokens.toFixed(0),        mono: true,  color: 'text-text-primary'   },
                 { label: 'Denom Price',     value: '$0.10',                        mono: false, color: 'text-primary-orange' },
                 { label: 'Proof Hash',      value: 'a7f3c…2b1e',                  mono: true,  color: 'text-primary-orange' },
@@ -589,7 +656,7 @@ export function EarlyRiskCurveFlow() {
             </div>
             <div className="flex justify-between text-xs mb-1">
               <span className="text-text-muted">Pool Balance</span>
-              <span className="font-bold text-primary-gold">${SALE_STATE.rewardPoolBalance.toLocaleString()}</span>
+              <span className="font-bold text-primary-gold">${rewardPoolBalance.toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-xs mb-3">
               <span className="text-text-muted">Your Max Rebate</span>
@@ -599,7 +666,7 @@ export function EarlyRiskCurveFlow() {
               Claimable only after sale is finalized. Capped at 5% pool allocation. Not profit — cashback only if pool is funded.
             </p>
             <button
-              onClick={() => setClaimSubmitted(!claimSubmitted)}
+              onClick={handleClaim}
               className={cn('w-full py-2 rounded-lg text-xs font-medium transition-colors',
                 claimSubmitted
                   ? 'bg-success/20 border border-success/30 text-success'
