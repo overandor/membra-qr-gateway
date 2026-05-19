@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { EarlyRiskCurveFlow } from './components/tokenomics/EarlyRiskCurveFlow';
+import { TokenSaleLive } from './components/tokenomics/TokenSaleLive';
 import { LLMInferencePanel } from './components/llm/LLMInferencePanel';
 import { Overview } from './components/dashboard/Overview';
+import { SettingsPanel } from './components/dashboard/SettingsPanel';
+import { InventoryGrid } from './components/artifacts/InventoryGrid';
+import { ArtifactCreator } from './components/artifacts/ArtifactCreator';
+import { WalletPanel } from './components/wallet/WalletPanel';
 import { api } from './services/api';
 import {
   LayoutDashboard, 
@@ -2571,7 +2576,8 @@ function App() {
         </div>
       </div>
 
-      {activeNav === 'AI Engine' ? (
+      {activeNav === 'Overview' && <Overview />}
+      {activeNav === 'AI Engine' && (
         <div className="h-full">
           <h2 className="text-3xl font-bold text-gradient mb-6 flex items-center gap-3">
             <Cpu className="w-8 h-8 text-[var(--accent-orange)]" />
@@ -2579,210 +2585,77 @@ function App() {
           </h2>
           <LLMInferencePanel liveArtifacts={liveArtifacts} liveEvents={liveEvents} liveSales={liveSales} health={health} />
         </div>
-      ) : activeNav === 'Overview' ? (
-        <Overview />
-      ) : (
-        <>
-          {/* Three State Machines */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold text-gradient mb-4 flex items-center gap-2">
-              <Workflow className="w-6 h-6 text-[var(--accent-orange)]" />
-              MEMBRA Doctrine Stack
-            </h3>
-
-            <EarlyRiskCurveFlow />
-            <ValueStateMachine />
-            <QRWorkflowFlow />
-            <TokenLaunchStateMachine />
-            <DeterministicProfitCapture />
-          </div>
-
-          {/* Clean Product Architecture */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold text-gradient mb-4 flex items-center gap-2">
-              <Building className="w-6 h-6 text-[var(--accent-orange)]" />
-              Clean Product Architecture
-            </h3>
-
-            <div className="neo-card p-6">
-              <div className="flex items-center gap-3 overflow-x-auto pb-4">
-                <div className="p-4 rounded-xl bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/20">
-                  <p className="text-sm font-bold text-[var(--accent-orange)]">Idea Monetization Layer v0</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-[var(--accent-orange)]/50 flex-shrink-0" />
-                <div className="p-4 rounded-xl bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/20">
-                  <p className="text-sm font-bold text-[var(--accent-orange)]">QR Gateway</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-[var(--accent-orange)]/50 flex-shrink-0" />
-                <div className="p-4 rounded-xl bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/20">
-                  <p className="text-sm font-bold text-[var(--accent-orange)]">Solana Wallet Signature</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-[var(--accent-orange)]/50 flex-shrink-0" />
-                <div className="p-4 rounded-xl bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/20">
-                  <p className="text-sm font-bold text-[var(--accent-orange)]">MCHAT Launch Discipline</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-[var(--accent-orange)]/50 flex-shrink-0" />
-                <div className="p-4 rounded-xl bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/20">
-                  <p className="text-sm font-bold text-[var(--accent-orange)]">Public Proof Capsule</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-[var(--accent-orange)]/50 flex-shrink-0" />
-                <div className="p-4 rounded-xl bg-[var(--accent-gold)]/10 border border-[var(--accent-gold)]/30">
-                  <p className="text-sm font-bold text-[var(--accent-gold)]">External Settlement</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Solana Wallet Signature Detail */}
-          <div className="mb-8">
-            <SolanaWalletSignature />
-          </div>
-
-          {/* Sprint Build Order */}
-          <div className="mb-8">
-            <SprintBuildOrder />
-          </div>
-
-          {/* LLM AI Engine */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold text-gradient mb-4 flex items-center gap-2">
-              <Zap className="w-6 h-6 text-[var(--accent-orange)]" />
-              MEMBRA AI Engine
-            </h3>
-            <LLMInferencePanel liveArtifacts={liveArtifacts} liveEvents={liveEvents} liveSales={liveSales} health={health} />
-          </div>
-
-          {/* Physical-Liquidity Layer */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold text-gradient mb-4 flex items-center gap-2">
-              <Building className="w-6 h-6 text-[var(--accent-orange)]" />
-              Physical-Liquidity Layer
-            </h3>
-            
-            {/* First Row: Apartment Warehouse + OS Stack */}
-            <div className="grid grid-cols-3 gap-6 mb-6">
-              <div className="col-span-2">
-                <ApartmentWarehouseCard />
-              </div>
-              
-              <div>
-                <OSLayersVisualization />
-              </div>
-            </div>
-            
-            {/* Human Value Dashboard Summary */}
-            <div className="mb-6">
-              <HumanValueDashboardSummary artifacts={liveArtifacts} events={liveEvents} sales={liveSales} />
-            </div>
-
-            {/* Second Row: OS Layers */}
-            <div className="mb-6">
-              <OSLayersVisualization />
-            </div>
-
-            {/* Third Row: Household Inventory + Intent + Local Matches */}
-            <div className="grid grid-cols-3 gap-6 mb-6">
-              <div>
-                <HouseholdInventoryCard artifacts={liveArtifacts} />
-              </div>
-              
-              <div>
-                <IntentMappingCard events={liveEvents} />
-              </div>
-              
-              <div>
-                <LocalMatchesCard artifacts={liveArtifacts} />
-              </div>
-            </div>
-
-            {/* Fourth Row: Micro Transaction Flow */}
-            <div className="mb-6">
-              <MicroTransactionFlow />
-            </div>
-          </div>
-
-          {/* Human Value Infrastructure */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold text-gradient mb-4 flex items-center gap-2">
-              <Hash className="w-6 h-6 text-[var(--accent-orange)]" />
-              Human Value Infrastructure
-            </h3>
-
-            {/* Main Grid */}
-            <div className="grid grid-cols-3 gap-6 mb-6">
-              {/* Live Artifact Scan */}
-              <div className="col-span-2">
-                <LiveArtifactScan />
-              </div>
-              
-              {/* Public Wallet */}
-              <div>
-                <PublicWalletCard />
-              </div>
-            </div>
-
-            {/* Second Row */}
-            <div className="grid grid-cols-3 gap-6 mb-6">
-            {/* Omni Artifact Gateway */}
-            <div className="col-span-1">
-              <OmniArtifactGateway />
-            </div>
-            
-            {/* Personal Chain */}
-            <div className="col-span-1">
-              <PersonalChain />
-            </div>
-            
-            {/* Provenance Module */}
-            <div className="col-span-1">
-              <ProvenanceModule />
-            </div>
-          </div>
-
-          {/* Third Row */}
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            {/* Reproducidescribe Loop */}
-            <div className="col-span-1">
-              <ReproducidescribeLoop />
-            </div>
-            
-            {/* Reward Curve */}
-            <div className="col-span-1">
-              <RewardCurve />
-            </div>
-            
-            {/* Live Artifact Engine */}
-            <div className="col-span-1">
-              <LiveArtifactEngine events={liveEvents} artifacts={liveArtifacts} />
-            </div>
-          </div>
-
-          {/* Recent Artifacts Table */}
-          <div className="mb-6">
-            <RecentArtifactsTable artifacts={liveArtifacts} />
-          </div>
-
-          {/* Mobile Preview */}
-          <div className="mb-6">
-            <MobilePreview />
-          </div>
-          </div>
-
-          {/* Footer Cards */}
-          <div className="grid grid-cols-5 gap-4 mb-6">
-            {footerCards.map((card, i) => (
-              <FooterCard key={i} card={card} />
-            ))}
-          </div>
-
-          {/* Footer Line */}
-          <div className="text-center py-6 border-t border-white/5">
-            <p className="text-gradient font-semibold mb-2">A chat can birth a token thesis, manifest, proof economy, and public narrative.</p>
-            <p className="text-gradient font-semibold mb-2">The token exists only after a signed Solana mainnet mint transaction creates a real mint address.</p>
-            <p className="text-gradient font-semibold mb-4">Official money exists only after external settlement clears.</p>
-            <p className="text-xs text-[var(--text-muted)]">Proof ≠ Money • Token ≠ Profit • Testnet ≠ Settlement • Mint Address = Token Exists • Stripe Settlement = Official Fiat Money</p>
-          </div>
-        </>
+      )}
+      {activeNav === 'Inventory' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Artifact Inventory</h2>
+          <InventoryGrid />
+        </div>
+      )}
+      {activeNav === 'Intent' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Intent Mapping</h2>
+          <IntentMappingCard events={liveEvents} />
+        </div>
+      )}
+      {activeNav === 'Local Match' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Local Commerce Matches</h2>
+          <LocalMatchesCard artifacts={liveArtifacts} />
+        </div>
+      )}
+      {activeNav === 'Ideas' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Ideas &amp; Proposals</h2>
+          <ApartmentWarehouseCard />
+          <SprintBuildOrder />
+        </div>
+      )}
+      {activeNav === 'Artifacts' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Create Artifact</h2>
+          <ArtifactCreator />
+        </div>
+      )}
+      {activeNav === 'Ledger' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Live Ledger Engine</h2>
+          <LiveArtifactEngine events={liveEvents} artifacts={liveArtifacts} />
+          <RecentArtifactsTable artifacts={liveArtifacts} />
+        </div>
+      )}
+      {activeNav === 'Wallet' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Wallet</h2>
+          <WalletPanel />
+          <SolanaWalletSignature />
+        </div>
+      )}
+      {activeNav === 'Payouts' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Token Sales &amp; Payouts</h2>
+          <TokenSaleLive />
+        </div>
+      )}
+      {activeNav === 'Analytics' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Analytics</h2>
+          <HumanValueDashboardSummary artifacts={liveArtifacts} events={liveEvents} sales={liveSales} />
+          <RewardCurve />
+        </div>
+      )}
+      {activeNav === 'Trust Center' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Trust Center</h2>
+          <EarlyRiskCurveFlow />
+          <ValueStateMachine />
+        </div>
+      )}
+      {activeNav === 'Settings' && (
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gradient">Settings</h2>
+          <SettingsPanel />
+        </div>
       )}
     </main>
   </div>
