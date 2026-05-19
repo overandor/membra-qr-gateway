@@ -2413,7 +2413,7 @@ const FooterCard = ({ card }) => {
 };
 
 function App() {
-  const [showLanding, setShowLanding] = useState(true);
+  const [showLanding, setShowLanding] = useState(false);
   const [activeNav, setActiveNav] = useState('Overview');
   const [health, setHealth] = useState(null);
   const [liveArtifacts, setLiveArtifacts] = useState([]);
