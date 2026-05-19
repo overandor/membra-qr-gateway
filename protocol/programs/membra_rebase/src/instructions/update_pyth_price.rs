@@ -1,11 +1,67 @@
 use anchor_lang::prelude::*;
-use pyth_sdk_solana::state::SolanaPriceAccount;
 
 use crate::{
     errors::RebaseError,
     events::{CircuitBreakerTripped, OraclePriceUpdated},
     state::{RebaseState, CONF_RATIO_DENOM, ORACLE_SOURCE_PYTH, REBASE_STATE_SEED},
 };
+
+// ---------------------------------------------------------------------------
+// Pyth V2 price-account byte offsets (repr(C, packed) layout from oracle.h)
+// ---------------------------------------------------------------------------
+// Offset  Size  Field
+//      0     4  magic     (must be 0xa1b2c3d4)
+//      4     4  ver       (must be 2)
+//      8     4  atype     (must be 3 = PC_ACCTYPE_PRICE)
+//     12     4  size
+//     16     4  ptype
+//     20     4  expo      (i32, negative for USD prices)
+//     24     4  num
+//     28     4  num_qt
+//     32     8  last_slot
+//     40     8  valid_slot
+//     48    24  twap  (Ema: val:i64, numer:i64, denom:i64)
+//     72    24  twac  (Ema: val:i64, numer:i64, denom:i64)
+//     96     8  prev_slot
+//    104     8  prev_price
+//    112     8  prev_conf
+//    120     8  prev_timestamp  ← Unix timestamp (i64) used for staleness
+//    128     8  agg.price  (i64)
+//    136     8  agg.conf   (u64)
+//    144     4  agg.status (u32; 1 = PC_STATUS_TRADING)
+//    148     4  agg.corp_act
+//    152     8  agg.pub_slot
+
+const PYTH_MAGIC: u32 = 0xa1b2c3d4;
+const PYTH_VERSION_2: u32 = 2;
+const PYTH_ACC_TYPE_PRICE: u32 = 3;
+const PYTH_STATUS_TRADING: u32 = 1;
+
+const OFF_MAGIC: usize = 0;
+const OFF_VER: usize = 4;
+const OFF_ATYPE: usize = 8;
+const OFF_EXPO: usize = 20;
+const OFF_PREV_TIMESTAMP: usize = 120;
+const OFF_AGG_PRICE: usize = 128;
+const OFF_AGG_CONF: usize = 136;
+const OFF_AGG_STATUS: usize = 144;
+
+fn read_u32_le(data: &[u8], off: usize) -> Option<u32> {
+    data.get(off..off + 4)
+        .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
+}
+fn read_i32_le(data: &[u8], off: usize) -> Option<i32> {
+    data.get(off..off + 4)
+        .map(|b| i32::from_le_bytes(b.try_into().unwrap()))
+}
+fn read_i64_le(data: &[u8], off: usize) -> Option<i64> {
+    data.get(off..off + 8)
+        .map(|b| i64::from_le_bytes(b.try_into().unwrap()))
+}
+fn read_u64_le(data: &[u8], off: usize) -> Option<u64> {
+    data.get(off..off + 8)
+        .map(|b| u64::from_le_bytes(b.try_into().unwrap()))
+}
 
 #[derive(Accounts)]
 pub struct UpdatePythPrice<'info> {
@@ -36,92 +92,116 @@ pub fn handler(ctx: Context<UpdatePythPrice>) -> Result<()> {
     let clock = Clock::get()?;
     let rebase_state = &mut ctx.accounts.rebase_state;
 
-    // Only for Pyth source
     require!(
         rebase_state.oracle_source == ORACLE_SOURCE_PYTH,
         RebaseError::InvalidOracleSource
     );
 
-    // Validate feed pubkey matches configured feed
     require!(
         ctx.accounts.pyth_price_feed.key() == rebase_state.oracle_price_feed,
         RebaseError::OraclePriceMissing
     );
 
-    // Parse Pyth price account
-    let price_feed = SolanaPriceAccount::account_info_to_feed(&ctx.accounts.pyth_price_feed)
-        .map_err(|_| RebaseError::OraclePriceMissing)?;
+    // Parse Pyth V2 price account from raw bytes to avoid AccountInfo and
+    // Pubkey type-boundary conflicts introduced by the solana-account-info /
+    // solana-pubkey standalone-crate split in pyth-sdk >= 0.8.
+    let data = ctx
+        .accounts
+        .pyth_price_feed
+        .try_borrow_data()
+        .map_err(|_| error!(RebaseError::OraclePriceMissing))?;
 
-    // Get latest price (not older than stale_price_threshold_seconds).
-    // get_price_no_older_than(current_unix_ts: i64, max_age_secs: u64)
-    let price = price_feed
-        .get_price_no_older_than(
-            clock.unix_timestamp,
-            rebase_state.stale_price_threshold_seconds as u64,
-        )
-        .ok_or(RebaseError::OraclePriceStale)?;
+    let magic = read_u32_le(&data, OFF_MAGIC).ok_or(error!(RebaseError::OraclePriceMissing))?;
+    let ver = read_u32_le(&data, OFF_VER).ok_or(error!(RebaseError::OraclePriceMissing))?;
+    let atype = read_u32_le(&data, OFF_ATYPE).ok_or(error!(RebaseError::OraclePriceMissing))?;
 
-    // Price must be positive
-    require!(price.price > 0, RebaseError::InvalidPrice);
+    require!(
+        magic == PYTH_MAGIC && ver == PYTH_VERSION_2 && atype == PYTH_ACC_TYPE_PRICE,
+        RebaseError::OraclePriceMissing
+    );
 
-    // Convert to USD with 6 decimal places.
-    // price.price is i64, price.expo is i32 (negative for assets priced in USD).
-    // We want: price_usd_6 = price.price * 10^(6 + price.expo)
-    // e.g. BTC/USD: price=4200000000, expo=-8  →  price_usd_6 = 4200000000 * 10^(6-8) = 42000_000 ($42.00)
+    let status =
+        read_u32_le(&data, OFF_AGG_STATUS).ok_or(error!(RebaseError::OraclePriceMissing))?;
+    require!(
+        status == PYTH_STATUS_TRADING,
+        RebaseError::OraclePriceMissing
+    );
+
+    let prev_timestamp = read_i64_le(&data, OFF_PREV_TIMESTAMP)
+        .ok_or(error!(RebaseError::OraclePriceMissing))?;
+
+    let age_secs = clock
+        .unix_timestamp
+        .checked_sub(prev_timestamp)
+        .unwrap_or(i64::MAX);
+    require!(
+        age_secs >= 0 && age_secs <= rebase_state.stale_price_threshold_seconds,
+        RebaseError::OraclePriceStale
+    );
+
+    let raw_price =
+        read_i64_le(&data, OFF_AGG_PRICE).ok_or(error!(RebaseError::OraclePriceMissing))?;
+    let raw_conf =
+        read_u64_le(&data, OFF_AGG_CONF).ok_or(error!(RebaseError::OraclePriceMissing))?;
+    let expo =
+        read_i32_le(&data, OFF_EXPO).ok_or(error!(RebaseError::OraclePriceMissing))?;
+
+    require!(raw_price > 0, RebaseError::InvalidPrice);
+
+    // Convert price to USD-6 (6 decimal places).
+    // price_usd_6 = raw_price × 10^(6 + expo)
+    // e.g. BTC/USD: raw_price=4200000000, expo=-8  →  42000_000 ($42.00)
     let target_expo: i32 = -6;
     let expo_diff = target_expo
-        .checked_sub(price.expo)
-        .ok_or(RebaseError::ArithmeticOverflow)?;
+        .checked_sub(expo)
+        .ok_or(error!(RebaseError::ArithmeticOverflow))?;
 
     let price_usd_6: u64 = if expo_diff >= 0 {
-        // Multiply: shift left
         let mult = 10u128.pow(expo_diff as u32);
         u64::try_from(
-            (price.price as u128)
+            (raw_price as u128)
                 .checked_mul(mult)
-                .ok_or(RebaseError::ArithmeticOverflow)?,
+                .ok_or(error!(RebaseError::ArithmeticOverflow))?,
         )
-        .map_err(|_| RebaseError::ArithmeticOverflow)?
+        .map_err(|_| error!(RebaseError::ArithmeticOverflow))?
     } else {
-        // Divide: shift right
         let div = 10u128.pow((-expo_diff) as u32);
         u64::try_from(
-            (price.price as u128)
+            (raw_price as u128)
                 .checked_div(div)
-                .ok_or(RebaseError::ArithmeticOverflow)?,
+                .ok_or(error!(RebaseError::ArithmeticOverflow))?,
         )
-        .map_err(|_| RebaseError::ArithmeticOverflow)?
+        .map_err(|_| error!(RebaseError::ArithmeticOverflow))?
     };
 
-    // Convert confidence with the same exponent scaling
     let confidence_usd_6: u64 = if expo_diff >= 0 {
         let mult = 10u128.pow(expo_diff as u32);
         u64::try_from(
-            (price.conf as u128)
+            (raw_conf as u128)
                 .checked_mul(mult)
-                .ok_or(RebaseError::ArithmeticOverflow)?,
+                .ok_or(error!(RebaseError::ArithmeticOverflow))?,
         )
-        .map_err(|_| RebaseError::ArithmeticOverflow)?
+        .map_err(|_| error!(RebaseError::ArithmeticOverflow))?
     } else {
         let div = 10u128.pow((-expo_diff) as u32);
         u64::try_from(
-            (price.conf as u128)
+            (raw_conf as u128)
                 .checked_div(div)
-                .ok_or(RebaseError::ArithmeticOverflow)?,
+                .ok_or(error!(RebaseError::ArithmeticOverflow))?,
         )
-        .map_err(|_| RebaseError::ArithmeticOverflow)?
+        .map_err(|_| error!(RebaseError::ArithmeticOverflow))?
     };
 
-    // Confidence check: must be less than price / CONF_RATIO_DENOM (10%)
+    // Confidence check: conf must be < price / CONF_RATIO_DENOM (10%)
     let max_allowed_confidence = price_usd_6
         .checked_div(CONF_RATIO_DENOM)
-        .ok_or(RebaseError::ArithmeticOverflow)?;
+        .ok_or(error!(RebaseError::ArithmeticOverflow))?;
     require!(
         confidence_usd_6 < max_allowed_confidence,
         RebaseError::OracleConfidenceTooLow
     );
 
-    // Volatility / circuit-breaker check (non-blocking — emits event but does not abort)
+    // Volatility / circuit-breaker check (non-blocking — emits event but continues)
     let prev_price = rebase_state.last_oracle_price_usd_6;
     let circuit_breaker_bps = rebase_state.volatility_circuit_breaker_bps;
 
@@ -129,17 +209,17 @@ pub fn handler(ctx: Context<UpdatePythPrice>) -> Result<()> {
         let price_diff = if price_usd_6 >= prev_price {
             price_usd_6
                 .checked_sub(prev_price)
-                .ok_or(RebaseError::ArithmeticOverflow)?
+                .ok_or(error!(RebaseError::ArithmeticOverflow))?
         } else {
             prev_price
                 .checked_sub(price_usd_6)
-                .ok_or(RebaseError::ArithmeticOverflow)?
+                .ok_or(error!(RebaseError::ArithmeticOverflow))?
         };
         let volatility_bps = (price_diff as u128)
             .checked_mul(10_000u128)
-            .ok_or(RebaseError::ArithmeticOverflow)?
+            .ok_or(error!(RebaseError::ArithmeticOverflow))?
             .checked_div(prev_price as u128)
-            .ok_or(RebaseError::ArithmeticOverflow)? as u64;
+            .ok_or(error!(RebaseError::ArithmeticOverflow))? as u64;
 
         if volatility_bps >= circuit_breaker_bps {
             emit!(CircuitBreakerTripped {
@@ -150,7 +230,6 @@ pub fn handler(ctx: Context<UpdatePythPrice>) -> Result<()> {
         }
     }
 
-    // Commit updated price and timestamp
     rebase_state.last_oracle_price_usd_6 = price_usd_6;
     rebase_state.last_oracle_update_ts = clock.unix_timestamp;
 
