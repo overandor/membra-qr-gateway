@@ -13,7 +13,7 @@ env:
   ANCHOR_VERSION: "0.29.0"
   SOLANA_VERSION: "1.18.26"
   NODE_VERSION: "20"
-  RUST_TOOLCHAIN: "1.75.0"
+  RUST_TOOLCHAIN: "1.85.0"
 
 jobs:
   # ── Rust / Anchor build ──────────────────────────────────────────────────
