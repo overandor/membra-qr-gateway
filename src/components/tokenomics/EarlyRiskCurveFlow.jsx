@@ -191,11 +191,11 @@ export function EarlyRiskCurveFlow() {
           setRebaseCount(state.epoch || 0);
           if (state.last_winners) setLastWinners(state.last_winners.slice(0, 5));
         }
-      } catch (_) {}
+      } catch (_) { /* ignore polling errors */ }
       try {
         const history = await api.getRebaseHistory(sale.sale_id, 10);
         if (!cancelled && history?.epochs) setEpochHistory(history.epochs);
-      } catch (_) {}
+      } catch (_) { /* ignore polling errors */ }
     }
     pollRebase();
     const interval = setInterval(pollRebase, 15000);
