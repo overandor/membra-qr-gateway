@@ -123,7 +123,7 @@ pub fn handler(ctx: Context<ResolveChallenge>, upheld: bool) -> Result<()> {
         project.weighted_tech_sum = project.weighted_tech_sum.saturating_sub((tech as u64).saturating_mul(stake));
         project.weighted_treasury_sum = project.weighted_treasury_sum.saturating_sub((treasury as u64).saturating_mul(stake));
         project.weighted_tokenomics_sum = project.weighted_tokenomics_sum.saturating_sub((tokenomics as u64).saturating_mul(stake));
-        project.weighted_gov_sum = project.weighted_gov_sum.saturating_sub((gov as u64).saturating_sub(stake));
+        project.weighted_gov_sum = project.weighted_gov_sum.saturating_sub((gov as u64).saturating_mul(stake));
         project.weighted_transparency_sum = project.weighted_transparency_sum.saturating_sub((transparency as u64).saturating_mul(stake));
         project.total_stake_weight = project.total_stake_weight.saturating_sub(stake);
         project.challenged_count = project.challenged_count.saturating_add(1);

@@ -19,11 +19,7 @@ pub struct RewardValidator<'info> {
     )]
     pub config: Account<'info, ProtocolConfig>,
 
-    #[account(
-        mut,
-        seeds = [b"reward_vault"],
-        bump,
-    )]
+    #[account(mut)]
     pub reward_vault: Account<'info, TokenAccount>,
 
     #[account(

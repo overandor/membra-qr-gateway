@@ -48,13 +48,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/anchor
-          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-rust1.76
+          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-v2
 
       - name: Install Anchor CLI
         if: steps.cache-anchor-build.outputs.cache-hit != 'true'
-        run: |
-          rustup toolchain install 1.76.0 --profile minimal
-          cargo +1.76.0 install anchor-cli --version ${{ env.ANCHOR_VERSION }} --locked
+        run: cargo install anchor-cli --version ${{ env.ANCHOR_VERSION }}
 
       - name: Create test keypair
         run: solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
@@ -135,13 +133,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/anchor
-          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-rust1.76
+          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-v2
 
       - name: Install Anchor CLI
         if: steps.cache-anchor-test.outputs.cache-hit != 'true'
-        run: |
-          rustup toolchain install 1.76.0 --profile minimal
-          cargo +1.76.0 install anchor-cli --version ${{ env.ANCHOR_VERSION }} --locked
+        run: cargo install anchor-cli --version ${{ env.ANCHOR_VERSION }}
 
       - uses: actions/setup-node@v4
         with:
