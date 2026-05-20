@@ -40,15 +40,22 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          curl -sSfL "https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install" \
+            -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Verify Solana tools
+        run: |
+          solana --version
+          cargo build-sbf --version
 
       - name: Cache Anchor CLI binary
         id: cache-anchor-build
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/anchor
-          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-rust1.76-v3
+          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-rust1.76-v4
 
       - name: Install Anchor CLI
         if: steps.cache-anchor-build.outputs.cache-hit != 'true'
@@ -127,7 +134,9 @@ jobs:
 
       - name: Install Solana CLI
         run: |
-          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          curl -sSfL "https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install" \
+            -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
       - name: Cache Anchor CLI binary
@@ -135,7 +144,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/anchor
-          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-rust1.76-v3
+          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-rust1.76-v4
 
       - name: Install Anchor CLI
         if: steps.cache-anchor-test.outputs.cache-hit != 'true'
