@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+env:
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ── Frontend build + tests ────────────────────────────────────────────────
+  frontend:
+    name: Frontend (build + vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci --frozen-lockfile
+
+      - name: Build production bundle
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:7860
+
+      - name: Run Vitest
+        run: npx vitest run --reporter=verbose
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: coverage/
+          retention-days: 7
+
+  # ── API tests ─────────────────────────────────────────────────────────────
+  api:
+    name: API (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('api/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r api/requirements.txt
+
+      - name: Run pytest
+        run: pytest api/tests/ -v --tb=short --cov=api --cov-report=xml
+        env:
+          DB_PATH: ":memory:"
+          JWT_SECRET: ci-test-secret-not-used-in-production-at-all
+          API_KEY_SALT: ci-test-salt-not-used-in-production-at-all
+          ADMIN_API_KEY: ci-test-admin-key
+          LOG_LEVEL: WARNING
+          SOLANA_RPC_URL: https://api.devnet.solana.com
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: coverage.xml
+          retention-days: 7
+
+  # ── Frontend lint ─────────────────────────────────────────────────────────
+  lint-frontend:
+    name: Lint (ESLint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci --frozen-lockfile
+
+      - name: Run ESLint
+        run: npx eslint src/ --ext .ts,.tsx --max-warnings 0
+
+  # ── API lint ──────────────────────────────────────────────────────────────
+  lint-api:
+    name: Lint (ruff + black)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('api/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-lint-
+
+      - name: Install linters
+        run: pip install ruff black
+
+      - name: Run ruff
+        run: ruff check api/
+
+      - name: Run black (check mode)
+        run: black --check api/

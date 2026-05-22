@@ -1,0 +1,84 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy (default: latest)"
+        required: false
+        default: "latest"
+
+jobs:
+  deploy-staging:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=sha-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to staging via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+
+            cd /opt/membra-qr-gateway
+
+            echo "Pulling image tag: ${{ steps.tag.outputs.tag }}"
+            export IMAGE_TAG="${{ steps.tag.outputs.tag }}"
+
+            docker-compose -f docker-compose.prod.yml pull api
+            docker-compose -f docker-compose.prod.yml up -d --no-build api nginx
+
+            # Wait for health check
+            echo "Waiting for API health check..."
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost:7860/health > /dev/null 2>&1; then
+                echo "Health check passed after ${i}x5s"
+                break
+              fi
+              if [ "$i" -eq 12 ]; then
+                echo "Health check FAILED after 60s — rolling back"
+                docker-compose -f docker-compose.prod.yml rollback api || true
+                exit 1
+              fi
+              sleep 5
+            done
+
+            echo "Staging deploy complete: ${{ steps.tag.outputs.tag }}"
+
+      - name: Notify Slack on success
+        if: success()
+        run: |
+          curl -sf -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"text":"Staging deploy succeeded: `${{ steps.tag.outputs.tag }}` by `${{ github.actor }}`"}' \
+            || true
+
+      - name: Notify Slack on failure
+        if: failure()
+        run: |
+          curl -sf -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"text":"FAILED staging deploy: `${{ steps.tag.outputs.tag }}` — see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
+            || true

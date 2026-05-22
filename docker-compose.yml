@@ -1,0 +1,82 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MEMBRA QR Gateway — Local Development Stack
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage:
+#   docker-compose up --build          # start all services
+#   docker-compose logs -f api         # tail api logs
+#   docker-compose down -v             # stop and remove volumes
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── FastAPI Backend ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: membra-qr-gateway:dev
+    container_name: membra_api
+    restart: unless-stopped
+    ports:
+      - "7860:7860"
+    env_file:
+      - .env
+    environment:
+      - DB_PATH=/app/data/membra.sqlite3
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      # Persist SQLite data between container restarts
+      - sqlite_data:/app/data
+      - ./storage:/app/storage
+      # Hot-reload: mount API source (uvicorn --reload)
+      - ./api:/app/api:ro
+    command: >
+      python -m uvicorn api.main:app
+      --host 0.0.0.0
+      --port 7860
+      --reload
+      --log-level ${LOG_LEVEL:-info}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - membra_net
+
+  # ── React Frontend (Vite dev server) ─────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: membra_frontend
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:7860
+    volumes:
+      - .:/app
+      - node_modules_cache:/app/node_modules
+    command: sh -c "npm ci --frozen-lockfile && npm run dev -- --host 0.0.0.0 --port 3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - membra_net
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  sqlite_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/data
+      o: bind
+  node_modules_cache:
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  membra_net:
+    driver: bridge

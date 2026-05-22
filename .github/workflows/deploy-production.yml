@@ -1,0 +1,102 @@
+name: Deploy — Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy (e.g. v1.1.0 or sha-abc1234)"
+        required: true
+      confirm:
+        description: "Type DEPLOY to confirm production deployment"
+        required: true
+
+jobs:
+  validate-input:
+    name: Validate confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation string
+        run: |
+          if [ "${{ inputs.confirm }}" != "DEPLOY" ]; then
+            echo "Confirmation string must be exactly DEPLOY — got: ${{ inputs.confirm }}"
+            exit 1
+          fi
+          echo "Confirmation accepted."
+
+  deploy-production:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    needs: validate-input
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to production via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_SSH_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+
+            cd /opt/membra-qr-gateway
+
+            echo "Deploying image tag: ${{ inputs.image_tag }}"
+            export IMAGE_TAG="${{ inputs.image_tag }}"
+
+            # Pull new image
+            docker-compose -f docker-compose.prod.yml pull api
+
+            # Rolling restart (nginx stays up)
+            docker-compose -f docker-compose.prod.yml up -d --no-build api
+
+            # Health check with 90s window
+            echo "Waiting for API health check..."
+            for i in $(seq 1 18); do
+              if curl -sf http://localhost:7860/health > /dev/null 2>&1; then
+                echo "Health check passed after ${i}x5s"
+                break
+              fi
+              if [ "$i" -eq 18 ]; then
+                echo "Health check FAILED after 90s — rolling back"
+                docker-compose -f docker-compose.prod.yml rollback api || true
+                exit 1
+              fi
+              sleep 5
+            done
+
+            echo "Production deploy complete: ${{ inputs.image_tag }}"
+
+      - name: Post-deploy health check from GitHub runner
+        run: |
+          sleep 10
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            "https://${{ secrets.PRODUCTION_HOST }}/health" 2>/dev/null || echo "000")
+          if [ "$STATUS" != "200" ]; then
+            echo "External health check returned HTTP $STATUS — investigate!"
+            exit 1
+          fi
+          echo "External health check: HTTP $STATUS — OK"
+
+      - name: Notify Slack on success
+        if: success()
+        run: |
+          curl -sf -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"text":"PRODUCTION deploy succeeded: `${{ inputs.image_tag }}` by `${{ github.actor }}`"}' \
+            || true
+
+      - name: Notify Slack on failure
+        if: failure()
+        run: |
+          curl -sf -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"text":"PRODUCTION deploy FAILED: `${{ inputs.image_tag }}` — immediate attention required. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
+            || true

@@ -1,0 +1,125 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MEMBRA QR Gateway — Production Stack
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#   docker-compose -f docker-compose.prod.yml ps
+#   docker-compose -f docker-compose.prod.yml logs -f
+#
+# Prerequisites:
+#   - .env file with production secrets
+#   - TLS certificates at /etc/letsencrypt/ (certbot)
+#   - Nginx config at infra/nginx/nginx.conf
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── FastAPI Backend ──────────────────────────────────────────────────────
+  api:
+    image: ghcr.io/membra/membra-qr-gateway:${IMAGE_TAG:-latest}
+    container_name: membra_api_prod
+    restart: always
+    expose:
+      - "7860"
+    env_file:
+      - .env
+    environment:
+      - DB_PATH=/app/data/membra.sqlite3
+      - LOG_LEVEL=INFO
+    volumes:
+      - sqlite_data:/app/data
+      - ./storage:/app/storage
+    command: >
+      python -m uvicorn api.main:app
+      --host 0.0.0.0
+      --port 7860
+      --workers 4
+      --log-level info
+      --access-log
+      --proxy-headers
+      --forwarded-allow-ips "*"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    networks:
+      - membra_internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── Nginx (reverse proxy + static files) ─────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: membra_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
+      - ./infra/nginx/rate-limit.conf:/etc/nginx/snippets/rate-limit.conf:ro
+      # Static frontend build (populated by CI/CD before deploy)
+      - ./static:/usr/share/nginx/html:ro
+      # TLS certificates (managed by certbot on host)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      # Nginx logs
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          cpus: "0.1"
+          memory: 32M
+    networks:
+      - membra_internal
+      - membra_external
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  sqlite_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  # Internal network — api only reachable by nginx
+  membra_internal:
+    driver: bridge
+    internal: false
+
+  # External network — only nginx exposes ports
+  membra_external:
+    driver: bridge

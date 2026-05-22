@@ -1,0 +1,88 @@
+# Dependencies
+node_modules/
+protocol/node_modules/
+
+# Version control
+.git/
+.gitignore
+.github/
+
+# Rust build artifacts
+protocol/target/
+target/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist-info/
+.eggs/
+
+# Environment files — NEVER bake secrets into image
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# SQLite databases
+*.sqlite3
+*.db
+data/
+
+# Storage
+storage/backups/
+storage/exports/
+
+# Test artifacts
+.pytest_cache/
+coverage/
+.nyc_output/
+htmlcov/
+*.coverage
+
+# Build artifacts (rebuilt in Docker)
+dist/
+build/
+static/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Terraform state (never in image)
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+infra/terraform/*.tfvars
+
+# Keys and certs
+security/keys/
+*.pem
+*.key
+*.crt
+*.p12
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI
+.github/
+
+# Temporary files
+tmp/
+temp/
