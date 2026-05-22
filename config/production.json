@@ -1,0 +1,49 @@
+{
+  "_comment": "Production environment — non-secret configuration values. Secrets are in Vault / host /etc/membra/.env.",
+  "environment": "production",
+  "api": {
+    "host": "0.0.0.0",
+    "port": 7860,
+    "workers": 4,
+    "logLevel": "WARNING",
+    "corsOrigins": ["https://app.membra.io", "https://www.membra.io", "https://membra.io"]
+  },
+  "solana": {
+    "cluster": "mainnet",
+    "commitment": "finalized"
+  },
+  "rateLimit": {
+    "enabled": true,
+    "defaultMax": 100,
+    "windowMs": 60000
+  },
+  "features": {
+    "walletConnect": true,
+    "stripePayments": true,
+    "onChainProof": true,
+    "debugMode": false
+  },
+  "monitoring": {
+    "metricsEnabled": true,
+    "tracingEnabled": true,
+    "tracingSampleRate": 0.1,
+    "alertsEnabled": true
+  },
+  "backup": {
+    "enabled": true,
+    "retentionDays": 30,
+    "cronSchedule": "0 2 * * *"
+  },
+  "database": {
+    "path": "/app/data/membra.sqlite3",
+    "walMode": true,
+    "busyTimeoutMs": 5000
+  },
+  "tls": {
+    "enabled": true,
+    "hsts": true,
+    "hstsMaxAge": 31536000,
+    "hstsIncludeSubDomains": true,
+    "hstsPreload": true
+  }
+}

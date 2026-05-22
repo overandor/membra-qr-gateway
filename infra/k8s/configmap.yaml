@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: membra-config
+  namespace: membra
+  labels:
+    app.kubernetes.io/name: membra
+    app.kubernetes.io/component: config
+data:
+  # ── Database ────────────────────────────────────────────────────────────────
+  DB_PATH: "/app/data/membra.sqlite3"
+
+  # ── Solana ──────────────────────────────────────────────────────────────────
+  SOLANA_RPC_URL: "https://api.mainnet-beta.solana.com"
+  SOLANA_CLUSTER: "mainnet"
+
+  # ── Stripe (non-secret) ──────────────────────────────────────────────────────
+  STRIPE_PRICE_ID: "price_REPLACE_WITH_LIVE_PRICE_ID"
+
+  # ── CORS ───────────────────────────────────────────────────────────────────
+  CORS_ORIGINS: "https://app.membra.io,https://www.membra.io"
+
+  # ── Logging ─────────────────────────────────────────────────────────────────
+  LOG_LEVEL: "WARNING"
+
+  # ── Server ──────────────────────────────────────────────────────────────────
+  PORT: "7860"
+  WORKERS: "2"
+
+  # ── Frontend API URL ────────────────────────────────────────────────────────
+  VITE_API_URL: "https://api.membra.io"

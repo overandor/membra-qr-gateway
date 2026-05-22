@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MEMBRA QR Gateway — Daily backup timer
+# Install: systemctl enable --now membra-backup.timer
+# Status:  systemctl status membra-backup.timer
+# Logs:    journalctl -u membra-backup.service
+# ─────────────────────────────────────────────────────────────────────────────
+
+[Unit]
+Description=MEMBRA QR Gateway — Daily SQLite backup timer
+After=network.target
+
+[Timer]
+# Run at 02:00 local time every day
+OnCalendar=*-*-* 02:00:00
+# If the machine was off at scheduled time, run as soon as it starts
+Persistent=true
+# Add up to 60s of jitter to avoid thundering-herd if multiple services share a host
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

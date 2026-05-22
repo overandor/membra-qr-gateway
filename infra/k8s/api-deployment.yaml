@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: membra-api
+  namespace: membra
+  labels:
+    app: membra-api
+    app.kubernetes.io/name: membra-api
+    app.kubernetes.io/component: api
+    app.kubernetes.io/version: "1.1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: membra-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: membra-api
+        app.kubernetes.io/name: membra-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7860"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: api
+          image: ghcr.io/membra/membra-qr-gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 7860
+              name: http
+              protocol: TCP
+
+          # ── Resource limits ─────────────────────────────────────────────────
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+          # ── Environment from ConfigMap (non-secret) ─────────────────────────
+          envFrom:
+            - configMapRef:
+                name: membra-config
+
+          # ── Environment from Secret ─────────────────────────────────────────
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: membra-secrets
+                  key: jwt-secret
+            - name: API_KEY_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: membra-secrets
+                  key: api-key-salt
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: membra-secrets
+                  key: admin-api-key
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: membra-secrets
+                  key: stripe-secret-key
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: membra-secrets
+                  key: stripe-webhook-secret
+            - name: MEMBRA_EVENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: membra-secrets
+                  key: membra-event-secret
+
+          # ── Volume mounts ───────────────────────────────────────────────────
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /app/data
+            - name: storage
+              mountPath: /app/storage
+
+          # ── Health checks ───────────────────────────────────────────────────
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7860
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7860
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # ── Security context ────────────────────────────────────────────────
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: membra-sqlite-pvc
+        - name: storage
+          persistentVolumeClaim:
+            claimName: membra-storage-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: membra-api
+  namespace: membra
+  labels:
+    app: membra-api
+spec:
+  selector:
+    app: membra-api
+  ports:
+    - name: http
+      port: 7860
+      targetPort: 7860
+      protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: membra-sqlite-pvc
+  namespace: membra
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: membra-storage-pvc
+  namespace: membra
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

@@ -1,0 +1,43 @@
+{
+  "_comment": "Staging environment — non-secret configuration values. Secrets are in GitHub Secrets / Vault.",
+  "environment": "staging",
+  "api": {
+    "host": "0.0.0.0",
+    "port": 7860,
+    "workers": 2,
+    "logLevel": "INFO",
+    "corsOrigins": ["https://staging.membra.io", "https://staging-app.membra.io"]
+  },
+  "solana": {
+    "cluster": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com",
+    "commitment": "confirmed"
+  },
+  "rateLimit": {
+    "enabled": true,
+    "defaultMax": 100,
+    "windowMs": 60000
+  },
+  "features": {
+    "walletConnect": true,
+    "stripePayments": true,
+    "onChainProof": true,
+    "debugMode": false
+  },
+  "monitoring": {
+    "metricsEnabled": true,
+    "tracingEnabled": true,
+    "tracingSampleRate": 0.5,
+    "alertsEnabled": true
+  },
+  "backup": {
+    "enabled": true,
+    "retentionDays": 14,
+    "cronSchedule": "0 2 * * *"
+  },
+  "database": {
+    "path": "/app/data/membra.sqlite3",
+    "walMode": true,
+    "busyTimeoutMs": 5000
+  }
+}

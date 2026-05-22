@@ -13,6 +13,9 @@ export const MEMBRA_REWARDS_PROGRAM_ID = new PublicKey(
 export const MEMBRA_GOVERNANCE_PROGRAM_ID = new PublicKey(
   "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkj476zPFsLnS"
 );
+export const MEMBRA_ATTESTATION_PROGRAM_ID = new PublicKey(
+  "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkk476zPFsLnS"
+);
 
 // PDA seeds
 export const IDO_CONFIG_SEED = Buffer.from("ido_config");
@@ -24,6 +27,15 @@ export const USER_STAKE_SEED = Buffer.from("user_stake");
 export const LOCK_RECORD_SEED = Buffer.from("lock_record");
 export const GOVERNANCE_SEED = Buffer.from("governance");
 export const PROPOSAL_SEED = Buffer.from("proposal");
+
+// Attestation PDA seeds (matching state.rs comments)
+export const ATTESTATION_SEEDS = {
+  PROTOCOL_CONFIG: Buffer.from("protocol_config"),
+  VALIDATOR: Buffer.from("validator"),
+  PROJECT: Buffer.from("project"),
+  ATTESTATION: Buffer.from("attestation"),
+  CHALLENGE: Buffer.from("challenge"),
+} as const;
 
 // Rebase index scale factor: 1e12 represents 1.0
 export const REBASE_INDEX_SCALE = BigInt("1000000000000");

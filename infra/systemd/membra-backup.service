@@ -1,0 +1,26 @@
+[Unit]
+Description=MEMBRA QR Gateway — SQLite backup (triggered by membra-backup.timer)
+After=network.target
+
+[Service]
+Type=oneshot
+User=membra
+Group=membra
+WorkingDirectory=/opt/membra-qr-gateway
+
+EnvironmentFile=/etc/membra/app.env
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/opt/membra-qr-gateway/scripts/backup.sh
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=membra-backup
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/membra-qr-gateway/data /opt/membra-qr-gateway/storage/backups
+
+# No restart for oneshot services

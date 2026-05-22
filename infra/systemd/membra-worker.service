@@ -1,0 +1,65 @@
+[Unit]
+Description=MEMBRA QR Gateway — Background Workers
+Documentation=https://github.com/membra/membra-qr-gateway
+After=network.target membra-api.service
+Wants=network.target
+
+[Service]
+Type=exec
+User=membra
+Group=membra
+WorkingDirectory=/opt/membra-qr-gateway
+
+# Load secrets from host-level env file (chmod 600, owned by membra)
+EnvironmentFile=/etc/membra/app.env
+
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# Runs the orchestrator that spawns receipt, chain_sync, and audit workers
+ExecStart=/opt/membra-qr-gateway/.venv/bin/python -m workers.queue
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy — workers can crash on transient Solana RPC failures
+Restart=on-failure
+RestartSec=10s
+StartLimitInterval=120s
+StartLimitBurst=5
+
+TimeoutStopSec=30s
+KillMode=mixed
+KillSignal=SIGTERM
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=membra-worker
+
+# ── Security sandboxing ───────────────────────────────────────────────────────
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/membra-qr-gateway/data /opt/membra-qr-gateway/storage
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RemoveIPC=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0027
+
+# ── Resource limits ───────────────────────────────────────────────────────────
+LimitNOFILE=16384
+MemoryMax=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

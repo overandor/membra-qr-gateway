@@ -1,0 +1,85 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: membra-ingress
+  namespace: membra
+  labels:
+    app.kubernetes.io/name: membra
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # TLS termination
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "DENY" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    # Rate limiting via nginx-ingress
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    # Proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    # Enable CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.membra.io"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Authorization, X-API-Key, X-Request-ID"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - app.membra.io
+        - api.membra.io
+      secretName: membra-tls
+  rules:
+    # API traffic → api service
+    - host: api.membra.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: membra-api
+                port:
+                  number: 7860
+
+    # Main app — API paths → api, everything else → frontend
+    - host: app.membra.io
+      http:
+        paths:
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: membra-api
+                port:
+                  number: 7860
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: membra-api
+                port:
+                  number: 7860
+          - path: /metrics
+            pathType: Exact
+            backend:
+              service:
+                name: membra-api
+                port:
+                  number: 7860
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: membra-frontend
+                port:
+                  number: 8080

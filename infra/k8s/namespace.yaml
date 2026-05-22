@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: membra
+  labels:
+    name: membra
+    app.kubernetes.io/name: membra
+    app.kubernetes.io/component: namespace

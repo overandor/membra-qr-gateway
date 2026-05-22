@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: membra-frontend
+  namespace: membra
+  labels:
+    app: membra-frontend
+    app.kubernetes.io/name: membra-frontend
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/version: "1.1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: membra-frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: membra-frontend
+        app.kubernetes.io/name: membra-frontend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101    # nginx user in nginx:alpine
+        runAsGroup: 101
+        fsGroup: 101
+
+      terminationGracePeriodSeconds: 10
+
+      containers:
+        - name: frontend
+          image: ghcr.io/membra/membra-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: membra-frontend
+  namespace: membra
+  labels:
+    app: membra-frontend
+spec:
+  selector:
+    app: membra-frontend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
