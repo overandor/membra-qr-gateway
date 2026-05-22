@@ -69,7 +69,7 @@ pub struct ProposeAction<'info> {
 /// - `description`   – human-readable rationale (≤ 255 bytes as UTF-8).
 /// - `action_data`   – serialised action parameters (≤ 255 bytes).
 /// - `proposal_id`   – must equal `governance_config.proposal_count`; used as
-///                     the PDA seed so it is passed explicitly by the caller.
+///   the PDA seed so it is passed explicitly by the caller.
 pub fn handler(
     ctx: Context<ProposeAction>,
     action_type: ActionType,

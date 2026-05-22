@@ -1,5 +1,6 @@
 pub mod claim_rewards;
 pub mod close_lock;
+pub mod close_stake_account;
 pub mod create_lock;
 pub mod initialize_rewards;
 pub mod stake;
@@ -18,6 +19,8 @@ pub mod unstake;
 pub use claim_rewards::*;
 #[allow(ambiguous_glob_reexports)]
 pub use close_lock::*;
+#[allow(ambiguous_glob_reexports)]
+pub use close_stake_account::*;
 #[allow(ambiguous_glob_reexports)]
 pub use create_lock::*;
 #[allow(ambiguous_glob_reexports)]

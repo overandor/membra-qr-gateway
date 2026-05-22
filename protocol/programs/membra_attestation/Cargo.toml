@@ -1,12 +1,12 @@
 [package]
-name = "membra_governance"
+name = "membra_attestation"
 version = "0.1.0"
-description = "MEMBRA governance and treasury multisig program"
+description = "MEMBRA Proof-of-Build attestation and validator registry program"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "membra_governance"
+name = "membra_attestation"
 
 [features]
 no-entrypoint = []

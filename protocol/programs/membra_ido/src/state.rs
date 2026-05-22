@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
 
+/// Seed prefix for the IDO configuration PDA.
+pub const IDO_CONFIG_SEED: &[u8] = b"ido_config";
+
 /// Global IDO configuration account.
 ///
-/// PDA seeds: `[b"ido_config", token_mint.key().as_ref()]`
+/// PDA seeds: `[IDO_CONFIG_SEED, token_mint.key().as_ref()]`
 #[account]
 #[derive(Default)]
 pub struct IdoConfig {

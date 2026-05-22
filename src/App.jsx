@@ -145,27 +145,28 @@ const osLayers = [
 
 // (static recentArtifacts and chainNodes removed — now fed from live API)
 
-// Footer cards
-const footerCards = [
-  { icon: Wallet, title: 'Public Wallet', desc: 'User-generated wallets for donations, deposits, and payouts.' },
-  { icon: Github, title: 'GitHub Ledger', desc: 'Open-source anchors, commits, and artifact provenance.' },
-  { icon: Shield, title: 'Notary Bridge', desc: 'Human verification, attestation, and identity trust.' },
-  { icon: DollarSign, title: 'Artifact Pricing', desc: 'Donation, license, bounty, subscription, or buyer-funded pricing.' },
-  { icon: Network, title: 'Cross-Chain Payout', desc: 'Distribution across chains and payout rails.' },
+// ── Split data ────────────────────────────────────────────────────────────────
+const SPLIT = [
+  { label: 'Treasury / Liquidity / Project Reserve', pct: 80, color: '#FF8A1F', glow: 'rgba(255,138,31,0.3)'  },
+  { label: 'Protocol / Builder',                     pct: 10, color: '#D6A64F', glow: 'rgba(214,166,79,0.3)'  },
+  { label: 'Validator / Proof Pool',                 pct:  5, color: '#9A6A35', glow: 'rgba(154,106,53,0.3)'  },
+  { label: 'Capped Early Reward Pool',               pct:  5, color: '#49D17D', glow: 'rgba(73,209,125,0.3)'  },
 ];
 
-// New Components for Value State Machine Doctrine Layer
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtCountdown(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
 
-const JoinMembraOnboarding = () => {
-  const onboardingSteps = [
-    { icon: Lock, label: 'Set Consent Boundaries', desc: 'Define what you capture and share', status: 'Required' },
-    { icon: Github, label: 'Connect Sources', desc: 'Link GitHub, IPFS, or local storage', status: 'Optional' },
-    { icon: Plus, label: 'Create First Artifact', desc: 'Capture work, inventory, or idea', status: 'Active' },
-    { icon: Hash, label: 'Hash + Anchor', desc: 'Generate SHA-256 and post to ledger', status: 'Optional' },
-    { icon: Radio, label: 'Publish Proof Capsule', desc: 'Export TikTok/YouTube proof package', status: 'Optional' },
-    { icon: ArrowRightCircle, label: 'Route to Market', desc: 'Connect to customers, sponsors, bounties', status: 'Optional' },
-    { icon: Receipt, label: 'Record Settlement', desc: 'Track only confirmed external payments', status: 'Optional' },
-  ];
+// ── Step Node ─────────────────────────────────────────────────────────────────
+function StepNode({ step, index, total }) {
+  const Icon   = step.icon;
+  const isDone = step.status === 'done';
+  const isAct  = step.status === 'active';
+  const isLock = step.status === 'locked';
 
   return (
     <div className="neo-card p-8 mb-6">
@@ -227,24 +228,10 @@ const JoinMembraOnboarding = () => {
       </div>
     </div>
   );
-};
+}
 
-const ValueStateMachine = () => {
-  const states = [
-    { number: 1, icon: Lightbulb, label: 'Human Idea', example: 'raw concept, insight', proves: 'human creativity', isMoney: false, boundary: 'proof value ≠ official money' },
-    { number: 2, icon: Lock, label: 'Consent Capture', example: 'user approval', proves: 'permission granted', isMoney: false },
-    { number: 3, icon: Layers, label: 'LLM Structuring', example: 'summarize, classify', proves: 'artifact organized', isMoney: false },
-    { number: 4, icon: ShieldCheck, label: 'Redaction', example: 'private-alpha protection', proves: 'safety enforced', isMoney: false },
-    { number: 5, icon: Hash, label: 'SHA-256 Hash', example: 'cryptographic fingerprint', proves: 'content exists at time', isMoney: false },
-    { number: 6, icon: Sparkles, label: 'LLM Notary Assist', example: 'flag risks, prepare packet', proves: 'notary packet ready', isMoney: false, boundary: 'notary review ≠ guaranteed value' },
-    { number: 7, icon: Shield, label: 'Human Notary/KYC', example: 'identity verification', proves: 'attestation issued', isMoney: false },
-    { number: 8, icon: Network, label: 'Testnet Receipt', example: 'Solana devnet/EVM testnet', proves: 'on-chain proof', isMoney: false, boundary: 'testnet receipt ≠ official money' },
-    { number: 9, icon: Radio, label: 'Public Proof Capsule', example: 'TikTok/YouTube export', proves: 'market visibility', isMoney: false, boundary: 'market signal ≠ official money' },
-    { number: 10, icon: ShoppingCart, label: 'Market Listing', example: 'offer/bounty/license', proves: 'transaction opportunity', isMoney: false },
-    { number: 11, icon: CreditCard, label: 'Stripe Settlement', example: 'fiat payment confirmed', proves: 'value settled', isMoney: true },
-    { number: 12, icon: GitBranch, label: 'Optional Mainnet', example: 'post-settlement anchor', proves: 'permanent record', isMoney: false },
-  ];
-
+// ── Split Bar ─────────────────────────────────────────────────────────────────
+function SplitSection() {
   return (
     <div className="neo-card p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
@@ -367,31 +354,19 @@ const ProofOfLifeTimeline = () => {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
-};
+}
 
-const ConsentControlCenter = () => {
-  const [consentToggles, setConsentToggles] = useState({
-    captureSpeech: true,
-    captureScreen: false,
-    captureGitHub: true,
-    captureInventory: true,
-    llmSummarization: true,
-    publicProofCapsule: false,
-    tiktokExport: false,
-    walletAddress: true,
-    paymentLink: true,
-  });
-
-  const hardBlocked = [
-    { label: 'Share private keys', icon: Key },
-    { label: 'Share seed phrase', icon: FileLock },
-    { label: 'Share raw KYC', icon: ShieldCheck },
-    { label: 'Share unredacted private chats', icon: EyeOff },
-    { label: 'Share wallet halves', icon: Ban },
+// ── Doctrine Footer ───────────────────────────────────────────────────────────
+function DoctrineFooter() {
+  const items = [
+    { icon: Hash,     label: 'Proof ≠ Money',        desc: 'On-chain hash is provenance, not settlement' },
+    { icon: Coins,    label: 'Token ≠ Profit',        desc: 'Token allocation is not guaranteed revenue' },
+    { icon: RefreshCw,label: 'Rebase ≠ Yield',        desc: 'Supply expansion is not passive income'     },
+    { icon: Radio,    label: 'Rebate ≠ Return',       desc: 'Capped cashback only if pool is funded'     },
+    { icon: Wallet,   label: 'QR ≠ Blind Execution',  desc: 'Scan opens context page, not transaction'   },
   ];
-
   return (
     <div className="neo-card p-6">
       <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -523,18 +498,11 @@ const PrivateAlphaPreservation = () => (
   </div>
 );
 
-const SettlementRailSelector = () => {
-  const rails = [
-    { name: 'Stripe payment', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'Invoice accepted', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'Contract signed', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'Bounty paid', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'Grant awarded', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'License sold', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'Sponsorship settled', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'Escrow released', status: 'Not settled', amount: '-', ref: '-' },
-    { name: 'Crypto payment', status: 'Not settled', amount: '-', ref: '-' },
-  ];
+  function copyAddr() {
+    navigator.clipboard.writeText('membra-qr-gateway').catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   return (
     <div className="neo-card p-6">
@@ -643,25 +611,7 @@ const LiveStudioArchitecture = () => (
             LLM appraisal ≠ money • Chat artifact ≠ payment • Solana wallet ≠ funding source • Immediate withdrawal requires existing funded pool, buyer, sponsor, bounty, donor, grant, or escrow
           </p>
         </div>
-      </div>
-    </div>
-  </div>
-);
-
-const LiveStudioUserFlow = () => {
-  const steps = [
-    { number: 1, label: 'Connect Solana wallet' },
-    { number: 2, label: 'Start MEMBRA Live Studio' },
-    { number: 3, label: 'Share screen and/or webcam' },
-    { number: 4, label: 'Chat with LLM' },
-    { number: 5, label: 'Prompt/response becomes artifact' },
-    { number: 6, label: 'MEMBRA appraises artifact' },
-    { number: 7, label: 'User approves monetization' },
-    { number: 8, label: 'System hashes approved artifact' },
-    { number: 9, label: 'System anchors proof' },
-    { number: 10, label: 'If funded, payout sent' },
-    { number: 11, label: 'User withdraws from wallet' },
-  ];
+      </nav>
 
   return (
     <div className="neo-card p-6 mb-6">
@@ -807,14 +757,19 @@ const AppraisalFormula = () => (
   </div>
 );
 
-const DevnetMVPPhases = () => {
-  const phases = [
-    { phase: 1, name: 'Local capture + artifact logging', status: 'Pending' },
-    { phase: 2, name: 'GitHub/IPFS anchoring', status: 'Pending' },
-    { phase: 3, name: 'Solana devnet receipt program', status: 'Pending' },
-    { phase: 4, name: 'Devnet USDC/SOL payout simulation', status: 'Pending' },
-    { phase: 5, name: 'Mainnet support pool (legal/security)', status: 'Pending' },
-  ];
+          <div className="relative">
+            <p className="text-xs font-bold text-primary-orange uppercase tracking-[0.3em] mb-3">
+              Early-Risk Curve · QR Tokenomics · Elastic Rebase
+            </p>
+            <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-3">
+              <span className="text-gradient">MCHAT</span>
+              <span className="text-text-primary"> Token IDO</span>
+            </h1>
+            <p className="text-text-muted text-base max-w-2xl mx-auto mb-8">
+              Buy at <strong className="text-primary-orange">$0.10 denomination</strong> · market oscillates $0.10–$1.00 ·
+              every 3h a random <strong className="text-primary-gold">3% of holders</strong> get supply rebased ·
+              bonus scales with holder count · no guaranteed profit
+            </p>
 
   return (
     <div className="neo-card p-6 mb-6">
@@ -2682,5 +2637,3 @@ function App() {
 </div>
   );
 }
-
-export default App;

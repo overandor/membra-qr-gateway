@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -145,6 +147,70 @@ body {
   box-shadow: 0 0 20px rgba(255, 138, 31, 0.15), 0 0 40px rgba(255, 138, 31, 0.08);
 }
 
+/* ── Glow accents ───────────────────────────────────────────────────────────── */
+.neo-glow-orange {
+  box-shadow:
+    0 0 0 1px rgba(255,138,31,0.25),
+    0 0 18px rgba(255,138,31,0.22),
+    0 0 40px rgba(255,138,31,0.08),
+    5px 5px 14px rgba(0,0,0,0.55),
+    -3px -3px 9px rgba(255,255,255,0.03);
+}
+.neo-glow-gold {
+  box-shadow:
+    0 0 0 1px rgba(214,166,79,0.25),
+    0 0 18px rgba(214,166,79,0.22),
+    0 0 40px rgba(214,166,79,0.08),
+    5px 5px 14px rgba(0,0,0,0.55),
+    -3px -3px 9px rgba(255,255,255,0.03);
+}
+.neo-glow-success {
+  box-shadow:
+    0 0 0 1px rgba(73,209,125,0.25),
+    0 0 18px rgba(73,209,125,0.20),
+    0 0 40px rgba(73,209,125,0.07),
+    5px 5px 14px rgba(0,0,0,0.55),
+    -3px -3px 9px rgba(255,255,255,0.03);
+}
+
+/* ── Step node ──────────────────────────────────────────────────────────────── */
+.step-node {
+  background: rgba(10,10,22,0.9);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-top-color: rgba(255,255,255,0.12);
+  box-shadow:
+    4px 4px 12px rgba(0,0,0,0.6),
+    -2px -2px 7px rgba(255,255,255,0.03),
+    inset 0 1px 0 rgba(255,255,255,0.07);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+.step-node-active {
+  background: rgba(255,138,31,0.12);
+  border-color: rgba(255,138,31,0.45);
+  border-top-color: rgba(255,138,31,0.65);
+  box-shadow:
+    0 0 0 1px rgba(255,138,31,0.2),
+    0 0 20px rgba(255,138,31,0.25),
+    0 0 40px rgba(255,138,31,0.10),
+    4px 4px 12px rgba(0,0,0,0.55);
+}
+.step-node-done {
+  background: rgba(73,209,125,0.10);
+  border-color: rgba(73,209,125,0.40);
+  border-top-color: rgba(73,209,125,0.60);
+  box-shadow:
+    0 0 0 1px rgba(73,209,125,0.15),
+    0 0 16px rgba(73,209,125,0.18),
+    4px 4px 12px rgba(0,0,0,0.55);
+}
+.step-node-locked {
+  background: rgba(10,10,22,0.5);
+  border-color: rgba(255,255,255,0.04);
+  opacity: 0.4;
+}
+
+/* ── Gradient text ──────────────────────────────────────────────────────────── */
 .text-gradient {
   background: linear-gradient(135deg, #FF8A1F, #D6A64F, #9A6A35);
   -webkit-background-clip: text;

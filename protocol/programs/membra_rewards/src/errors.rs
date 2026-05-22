@@ -50,4 +50,8 @@ pub enum RewardsError {
     /// NOTE: This variant is informational; it does not block the transaction.
     #[msg("Early exit penalty applied")]
     EarlyExitPenaltyApplied,
+
+    /// Penalty destination must not be the default (zero) pubkey.
+    #[msg("Invalid penalty destination: must not be the default pubkey")]
+    InvalidPenaltyDestination,
 }

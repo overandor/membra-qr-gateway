@@ -37,8 +37,8 @@
 ///
 /// In the current implementation the on-chain feed account is stored for future
 /// integration; the price value is passed as a parameter to `update_oracle_price`
-/// regardless of source.  A full Pyth/Switchboard account-read integration can be
-/// dropped in without changing the instruction interface.
+/// regardless of source.  Use `update_pyth_price` for a permissionless, trustless
+/// price update that reads directly from the Pyth on-chain price feed account.
 use anchor_lang::prelude::*;
 
 pub mod errors;
@@ -69,6 +69,18 @@ pub mod membra_rebase {
     }
 
     // ─── Oracle ────────────────────────────────────────────────────────────────
+
+    /// Update oracle price directly from the Pyth price feed account.
+    /// Permissionless — any keeper can call when oracle_source == 0 (Pyth).
+    pub fn update_pyth_price(ctx: Context<UpdatePythPrice>) -> Result<()> {
+        instructions::update_pyth_price::handler(ctx)
+    }
+
+    /// Update oracle price directly from the Switchboard V2 aggregator feed account.
+    /// Permissionless — any keeper can call when oracle_source == 1 (Switchboard).
+    pub fn update_switchboard_price(ctx: Context<UpdateSwitchboardPrice>) -> Result<()> {
+        instructions::update_switchboard_price::handler(ctx)
+    }
 
     /// Push a new price observation into `RebaseState`.
     ///
