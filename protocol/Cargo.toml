@@ -4,7 +4,8 @@ members = [
     "programs/membra_rebase",
     "programs/membra_rewards",
     "programs/membra_governance",
-    "programs/membra_attestation",
+    "programs/membra_mmce",
+    "programs/membra_llm",
 ]
 resolver = "2"
 
