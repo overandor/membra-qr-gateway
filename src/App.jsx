@@ -65,7 +65,6 @@ import {
   ArrowUpRight,
   ArrowDown,
   ArrowDownRight,
-  ArrowDown,
   Timer,
   Calendar,
   CreditCard,
@@ -359,7 +358,7 @@ const ProofOfLifeTimeline = () => {
           </div>
         ))}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -503,12 +502,13 @@ const PrivateAlphaPreservation = () => (
   </div>
 );
 
-  function copyAddr() {
-    navigator.clipboard.writeText('membra-qr-gateway').catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
+const ExternalSettlementRails = () => {
+  const rails = [
+    { name: 'Stripe', ref: 'pi_3Abc...', amount: '$420.00', status: 'Pending' },
+    { name: 'USDC On-chain', ref: '0x8b4c...', amount: '$840.00', status: 'Confirmed' },
+    { name: 'Phantom Pay', ref: 'tx_9f2e...', amount: '$210.00', status: 'Pending' },
+    { name: 'Wire Transfer', ref: 'REF-001', amount: '$2,100.00', status: 'Unsettled' },
+  ];
   return (
     <div className="neo-card p-6">
       <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -616,29 +616,10 @@ const LiveStudioArchitecture = () => (
             LLM appraisal ≠ money • Chat artifact ≠ payment • Solana wallet ≠ funding source • Immediate withdrawal requires existing funded pool, buyer, sponsor, bounty, donor, grant, or escrow
           </p>
         </div>
-      </nav>
-
-  return (
-    <div className="neo-card p-6 mb-6">
-      <h3 className="font-semibold mb-4 flex items-center gap-2">
-        <Workflow className="w-5 h-5 text-[var(--accent-orange)]" />
-        User Experience Flow
-      </h3>
-
-      <div className="grid grid-cols-4 gap-3">
-        {steps.map((step, i) => (
-          <div key={i} className="p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--accent-orange)]/10">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-[var(--accent-orange)]">{step.number}</span>
-              <div className="w-2 h-2 rounded-full bg-success" />
-            </div>
-            <p className="text-xs text-[var(--text-muted)] leading-tight">{step.label}</p>
-          </div>
-        ))}
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 const ArtifactSchema = () => (
   <div className="neo-card p-6 mb-6">
@@ -762,20 +743,14 @@ const AppraisalFormula = () => (
   </div>
 );
 
-          <div className="relative">
-            <p className="text-xs font-bold text-primary-orange uppercase tracking-[0.3em] mb-3">
-              Early-Risk Curve · QR Tokenomics · Elastic Rebase
-            </p>
-            <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-3">
-              <span className="text-gradient">MCHAT</span>
-              <span className="text-text-primary"> Token IDO</span>
-            </h1>
-            <p className="text-text-muted text-base max-w-2xl mx-auto mb-8">
-              Buy at <strong className="text-primary-orange">$0.10 denomination</strong> · market oscillates $0.10–$1.00 ·
-              every 3h a random <strong className="text-primary-gold">3% of holders</strong> get supply rebased ·
-              bonus scales with holder count · no guaranteed profit
-            </p>
-
+const DevnetMVPPhases = () => {
+  const phases = [
+    { phase: 1, name: 'QR scan → web page (no execution)', status: 'Planned' },
+    { phase: 2, name: 'Wallet connect + consent gate', status: 'Planned' },
+    { phase: 3, name: 'Live artifact hash + Solana receipt', status: 'Planned' },
+    { phase: 4, name: 'IDO token sale + rebase engine', status: 'In Progress' },
+    { phase: 5, name: 'Treasury pool + payout rail', status: 'Planned' },
+  ];
   return (
     <div className="neo-card p-6 mb-6">
       <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -2549,7 +2524,6 @@ function App() {
               </div>
             </div>
             <p className="text-[var(--text-muted)] mb-4">MEMBRA does not pretend a chat is money. MEMBRA turns a chat into a proof capsule, a token thesis, a public launch manifest, and a disciplined path to settlement.</p>
-            
             {apiError && (
               <div className="mb-4 p-3 rounded-lg bg-[var(--accent-danger)]/10 border border-[var(--accent-danger)]/30 text-[var(--accent-danger)] text-sm flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" /> {apiError}
@@ -2570,31 +2544,9 @@ function App() {
               </div>
               <div className="neo-card-pressed p-3 text-center">
                 <p className="text-[10px] text-[var(--text-muted)] uppercase-tracking">DB Status</p>
-          </div>
-        </div>
-        <p className="text-[var(--text-muted)] mb-4">MEMBRA does not pretend a chat is money. MEMBRA turns a chat into a proof capsule, a token thesis, a public launch manifest, and a disciplined path to settlement.</p>
-        
-        {apiError && (
-          <div className="mb-4 p-3 rounded-lg bg-[var(--accent-danger)]/10 border border-[var(--accent-danger)]/30 text-[var(--accent-danger)] text-sm flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" /> {apiError}
-          </div>
-        )}
-        <div className="grid grid-cols-4 gap-3">
-          <div className="neo-card-pressed p-3 text-center">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase-tracking">Backend</p>
-            <p className={`text-sm font-bold ${health ? 'text-[var(--accent-success)]' : 'text-[var(--accent-danger)]'}`}>{health ? 'Online' : 'Offline'}</p>
-          </div>
-          <div className="neo-card-pressed p-3 text-center">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase-tracking">Artifacts</p>
-            <p className="text-sm font-bold text-[var(--accent-gold)]">{liveArtifacts.length}</p>
-          </div>
-          <div className="neo-card-pressed p-3 text-center">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase-tracking">Events</p>
-            <p className="text-sm font-bold text-[var(--accent-orange)]">{liveEvents.length}</p>
-          </div>
-          <div className="neo-card-pressed p-3 text-center">
-            <p className="text-[10px] text-[var(--text-muted)] uppercase-tracking">DB Status</p>
-            <p className="text-sm font-bold text-[var(--text-muted)]">{health?.db || '—'}</p>
+                <p className="text-sm font-bold text-[var(--text-muted)]">{health?.db || '—'}</p>
+              </div>
+            </div>
           </div>
 
           {/* Original MEMBRA Components */}
@@ -2679,9 +2631,6 @@ function App() {
             <p className="text-xs text-text-muted">Proof ≠ Money • Token ≠ Profit • Testnet ≠ Settlement • Mint Address = Token Exists • Stripe Settlement = Official Fiat Money</p>
           </div>
           </>)}
-        </main>
-      </div>
-
       {activeNav === 'Overview' && <Overview />}
       {activeNav === 'AI Engine' && (
         <div className="h-full">
@@ -2768,3 +2717,5 @@ function App() {
 </div>
   );
 }
+
+export default App;
