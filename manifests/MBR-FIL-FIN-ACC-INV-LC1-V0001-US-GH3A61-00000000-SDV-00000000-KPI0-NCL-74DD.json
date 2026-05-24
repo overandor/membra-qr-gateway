@@ -1,0 +1,23 @@
+{
+  "sku": "MBR-FIL-FIN-ACC-INV-LC1-V0001-US-GH3A61-00000000-SDV-00000000-KPI0-NCL-74DD",
+  "object_type": "file",
+  "category": "FIN",
+  "subcategory": "ACC",
+  "kind": "INV",
+  "lifecycle_stage": 1,
+  "version": 1,
+  "jurisdiction": "US",
+  "subject_pid": "PID-MBR-OWNER-US-2026-F7D120",
+  "subject_pid_hash": "sha256:4f3087cb5f593219cbc69ea06ac01d2d4b89edacc4891cb53dcf61c5d0cf730b",
+  "raw_file_hash": "sha256:8ff27a5f396ab48c532fb124bc50116ecc9e836dcb0c2c885165a3ef7f83709b",
+  "base64_hash": "sha256:490ee9975046cb61f0b858cdda1dd30d824a0131227c57012a7444cc3b8b6513",
+  "sku_hash": "sha256:18d782895bc1d7aa410f6580a98485e9da420540bb641496eb081da1ba630f78",
+  "content_exposed": false,
+  "identity_exposed": false,
+  "filename_hint": "invoice_2026_Q2_0042.csv",
+  "extension": ".csv",
+  "file_size_bytes": 294,
+  "created_at": "2026-05-24T14:16:36.610415+00:00",
+  "updated_at": "2026-05-24T14:16:36.610415+00:00",
+  "manifest_hash": "sha256:0e788c62d1bf7acacee3ca2eac61b92df63ebcdc2b19bf8f4e5e1322e79fbeed"
+}
