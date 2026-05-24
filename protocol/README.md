@@ -94,7 +94,8 @@ protocol/
     ├── SECURITY.md              # Security properties and known risks
     ├── COMPLIANCE.md            # Compliance-safe language and disclosures
     ├── DEPLOYMENT.md            # Deployment guide
-    └── FRONTEND_INTEGRATION.md  # SDK usage guide
+    ├── FRONTEND_INTEGRATION.md  # SDK usage guide
+    └── MIP-007-network-foundry.md # MEMBRA Network Foundry: File-Backed Networks and Solana proof-bridge design
 ```
 
 ---

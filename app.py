@@ -11,21 +11,32 @@ import datetime as dt
 import hashlib
 import hmac
 import json
+import logging
 import math
 import os
+import random
 import sqlite3
+import time
 import uuid
 from pathlib import Path
 from typing import Any
 
 import stripe
 import uvicorn
+from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
+
+load_dotenv()
 
 APP_NAME = "MEMBRA QR Gateway"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 DB_PATH = Path(os.getenv("DB_PATH", "/tmp/membra_qr_gateway.sqlite3"))
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:7860").rstrip("/")
 MEMBRA_EVENT_SECRET = os.getenv("MEMBRA_EVENT_SECRET", "")
@@ -33,18 +44,75 @@ PUBLIC_SUPPORT_WALLET = os.getenv("PUBLIC_SUPPORT_WALLET", "")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
+_ADMIN_KEY = os.getenv("ADMIN_API_KEY", "")
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+_ENV = os.getenv("ENV", "development")
+_PRODUCTION = _ENV.lower() in ("production", "prod", "staging")
+
 stripe.api_key = STRIPE_SECRET_KEY or None
-api = FastAPI(title=APP_NAME, version=APP_VERSION)
+
+# ── Structured JSON logging ──────────────────────────────────────────────────
+class _JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if hasattr(record, "rid"):
+            log["rid"] = record.rid
+        if record.exc_info:
+            log["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(log, default=str)
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JSONFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
+logger = logging.getLogger("membra")
+
+# Rate limiter backed by in-memory storage (swap to Redis in production)
+limiter = Limiter(key_func=get_remote_address)
+
+
+def _validate_startup() -> None:
+    """Fail fast in production if required secrets are missing."""
+    if _PRODUCTION:
+        missing = []
+        if not _ADMIN_KEY:
+            missing.append("ADMIN_API_KEY")
+        if not MEMBRA_EVENT_SECRET:
+            missing.append("MEMBRA_EVENT_SECRET")
+        if missing:
+            logger.error("PRODUCTION STARTUP BLOCKED: missing secrets: %s", ", ".join(missing))
+            raise RuntimeError(f"Missing required secrets in production: {', '.join(missing)}")
+        logger.info("Production secrets validated")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("%s v%s starting in %s mode", APP_NAME, APP_VERSION, _ENV)
+    _validate_startup()
+    init_db()
+    logger.info("Database initialized at %s", DB_PATH)
+    yield
+    logger.info("%s shutting down gracefully", APP_NAME)
+
+
+api = FastAPI(title=APP_NAME, version=APP_VERSION, lifespan=lifespan)
+api.state.limiter = limiter
+api.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 class ArtifactIn(BaseModel):
-    owner_email: str = ""
-    artifact_title: str
-    artifact_type: str = "proofbook"
-    destination_url: str
-    public_wallet: str = ""
-    provenance_notes: str = ""
-    consent_scope: str = "public hash, timestamp, QR redirect, consented metadata only"
+    owner_email: str = Field(default="", max_length=256)
+    artifact_title: str = Field(..., min_length=1, max_length=256)
+    artifact_type: str = Field(default="proofbook", max_length=64)
+    destination_url: str = Field(..., max_length=2048)
+    public_wallet: str = Field(default="", max_length=128)
+    provenance_notes: str = Field(default="", max_length=4096)
+    consent_scope: str = Field(default="public hash, timestamp, QR redirect, consented metadata only", max_length=512)
 
 
 class CheckoutIn(BaseModel):
@@ -77,6 +145,17 @@ def db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=30, isolation_level=None)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
+def db_tx() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
@@ -211,7 +290,73 @@ def init_db() -> None:
         """)
 
 
-init_db()
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        if _PRODUCTION:
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        return response
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        rid = str(uuid.uuid4())[:8]
+        request.state.rid = rid
+        start = time.time()
+        try:
+            response = await call_next(request)
+            duration = (time.time() - start) * 1000
+            logger.info("rid=%s method=%s path=%s status=%d ms=%.2f", rid, request.method, request.url.path, response.status_code, duration)
+            response.headers["X-Request-ID"] = rid
+            return response
+        except Exception as exc:
+            duration = (time.time() - start) * 1000
+            logger.error("rid=%s method=%s path=%s error=%s ms=%.2f", rid, request.method, request.url.path, exc, duration)
+            raise
+
+
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    MAX_SIZE = 1_048_576  # 1 MB
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH"):
+            content_length = request.headers.get("content-length")
+            if content_length and int(content_length) > self.MAX_SIZE:
+                return JSONResponse({"detail": "Request body too large"}, status_code=413)
+        return await call_next(request)
+
+
+class AuditLoggingMiddleware(BaseHTTPMiddleware):
+    MUTATIONS = {"POST", "PUT", "PATCH", "DELETE"}
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.method in self.MUTATIONS and request.url.path.startswith("/api/"):
+            rid = getattr(request.state, "rid", "—")
+            client = request.client.host if request.client else "—"
+            body = ""
+            if request.method in ("POST", "PUT", "PATCH"):
+                try:
+                    body_bytes = await request.body()
+                    body = hashlib.sha256(body_bytes).hexdigest()[:16]
+                except Exception:
+                    body = "<unavailable>"
+            logger.info(
+                "audit rid=%s client=%s method=%s path=%s status=%d body_sha=%s",
+                rid, client, request.method, request.url.path, response.status_code, body,
+                extra={"rid": rid},
+            )
+        return response
+
+
+api.add_middleware(SecurityHeadersMiddleware)
+api.add_middleware(RequestLoggingMiddleware)
+api.add_middleware(MaxBodySizeMiddleware)
+api.add_middleware(AuditLoggingMiddleware)
 
 
 def artifact_hash(payload: dict[str, Any]) -> str:
@@ -293,29 +438,52 @@ def artifact_from_event(data: MembraEventIn) -> dict[str, Any] | None:
 
 
 
+def _db_health() -> dict[str, Any]:
+    try:
+        with db() as conn:
+            conn.execute("SELECT 1")
+        return {"db": "connected", "db_path": str(DB_PATH)}
+    except Exception as exc:
+        return {"db": "error", "detail": str(exc)}
+
+
 @api.get("/api/health")
-def health():
-    return {"ok": True, "app": APP_NAME, "version": APP_VERSION, "stripe_configured": bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID)}
+@limiter.limit("30/minute")
+def health(request: Request):
+    db_status = _db_health()
+    ok = db_status["db"] == "connected"
+    return {
+        "ok": ok,
+        "app": APP_NAME,
+        "version": APP_VERSION,
+        "stripe_configured": bool(STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID),
+        "env": _ENV,
+        **db_status,
+    }
 
 
 @api.get("/api/ready")
-def ready():
+@limiter.limit("30/minute")
+def ready(request: Request):
     warnings = [] if MEMBRA_EVENT_SECRET else ["MEMBRA_EVENT_SECRET not configured; signed event verification is permissive"]
-    return {"ok": True, "warnings": warnings, "artifact_count": len(artifact_rows()), "event_count": len(event_rows())}
+    return {"ok": True, "ready": True, "warnings": warnings, "artifact_count": len(artifact_rows()), "event_count": len(event_rows())}
 
 
 @api.get("/api/artifacts")
-def list_artifacts():
+@limiter.limit("60/minute")
+def list_artifacts(request: Request):
     return {"artifacts": artifact_rows()}
 
 
 @api.post("/api/artifacts")
-def create_artifact(data: ArtifactIn):
+@limiter.limit("10/minute")
+def create_artifact(request: Request, data: ArtifactIn):
     return build_artifact(data)
 
 
 @api.post("/api/events/ingest")
-def ingest_event(data: MembraEventIn):
+@limiter.limit("30/minute")
+def ingest_event(request: Request, data: MembraEventIn):
     event = data.model_dump()
     if not verify_event_signature(event):
         raise HTTPException(401, "invalid event signature")
@@ -329,16 +497,37 @@ def ingest_event(data: MembraEventIn):
 
 
 @api.get("/api/events")
-def list_events():
+@limiter.limit("60/minute")
+def list_events(request: Request):
     return {"events": event_rows()}
 
 
+def ui_checkout(email: str, artifact_id: str) -> str:
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        raise HTTPException(500, "Stripe is not fully configured")
+    try:
+        session = stripe.checkout.Session.create(
+            customer_email=email or None,
+            metadata={"artifact_id": artifact_id},
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            mode="payment",
+            success_url=f"{APP_BASE_URL}/g/{artifact_id}?checkout=success",
+            cancel_url=f"{APP_BASE_URL}/g/{artifact_id}?checkout=cancel",
+        )
+        return session.url or ""
+    except Exception as exc:
+        logger.error("Stripe checkout failed: %s", exc)
+        raise HTTPException(502, f"Stripe error: {exc}")
+
+
 @api.post("/api/stripe/create-checkout-session")
-def checkout(data: CheckoutIn):
+@limiter.limit("10/minute")
+def checkout(request: Request, data: CheckoutIn):
     return {"url": ui_checkout(data.email, data.artifact_id or "")}
 
 
 @api.post("/api/stripe/webhook")
+@limiter.limit("60/minute")
 async def stripe_webhook(request: Request, stripe_signature: str | None = Header(default=None)):
     if not STRIPE_WEBHOOK_SECRET:
         raise HTTPException(500, "STRIPE_WEBHOOK_SECRET is not configured")
@@ -357,7 +546,10 @@ async def stripe_webhook(request: Request, stripe_signature: str | None = Header
 
 
 @api.get("/g/{artifact_id}")
-def gateway_scan(artifact_id: str):
+@limiter.limit("120/minute")
+def gateway_scan(request: Request, artifact_id: str):
+    if not artifact_id or len(artifact_id) > 64:
+        raise HTTPException(400, "Invalid artifact ID")
     with db() as conn:
         row = conn.execute("SELECT destination_url,artifact_hash FROM artifacts WHERE artifact_id=?", (artifact_id,)).fetchone()
         conn.execute("INSERT INTO gateway_events VALUES(?,?,?,?,?)", ("evt_" + uuid.uuid4().hex[:12], artifact_id, "scan", "{}", now()))
@@ -421,36 +613,37 @@ def _contribution_receipt_hash(contribution_id: str, sale_id: str, buyer_wallet:
 
 class TokenSaleIn(BaseModel):
     artifact_id: str = ""
-    name: str
-    symbol: str
-    max_supply: float = _DEFAULT_MAX_SUPPLY
-    initial_price: float = _DEFAULT_INITIAL_PRICE
-    max_bonus_pct: float = _DEFAULT_MAX_BONUS_PCT
-    decay_lambda: float = _DEFAULT_DECAY_LAMBDA
+    name: str = Field(..., min_length=1, max_length=128)
+    symbol: str = Field(..., min_length=1, max_length=16)
+    max_supply: float = Field(default=_DEFAULT_MAX_SUPPLY, gt=0, le=1_000_000_000_000)
+    initial_price: float = Field(default=_DEFAULT_INITIAL_PRICE, gt=0, le=1_000)
+    max_bonus_pct: float = Field(default=_DEFAULT_MAX_BONUS_PCT, ge=0, le=10)
+    decay_lambda: float = Field(default=_DEFAULT_DECAY_LAMBDA, ge=0, le=100)
 
 
 class ContributionIn(BaseModel):
-    sale_id: str
-    buyer_wallet: str
-    currency: str = "USDC"  # "SOL" | "USDC"
-    amount: float  # native units (SOL or USDC)
-    sol_usd_rate: float = _SOL_USD_RATE
+    sale_id: str = Field(..., min_length=1, max_length=64)
+    buyer_wallet: str = Field(..., min_length=1, max_length=128)
+    currency: str = Field(default="USDC", pattern=r"^(SOL|USDC)$")
+    amount: float = Field(..., gt=0, le=1_000_000_000)  # native units (SOL or USDC)
+    sol_usd_rate: float = Field(default=_SOL_USD_RATE, gt=0, le=1_000_000)
 
 
 class RebateClaimIn(BaseModel):
-    sale_id: str
-    contribution_id: str
-    buyer_wallet: str
+    sale_id: str = Field(..., min_length=1, max_length=64)
+    contribution_id: str = Field(..., min_length=1, max_length=64)
+    buyer_wallet: str = Field(..., min_length=1, max_length=128)
 
 
 class RebaseTriggerIn(BaseModel):
-    sale_id: str
-    admin_key: str
-    market_price: float | None = None   # override; omit for random
+    sale_id: str = Field(..., min_length=1, max_length=64)
+    admin_key: str = Field(..., min_length=1, max_length=256)
+    market_price: float | None = Field(default=None, gt=0, le=1_000_000)
 
 
 @api.post("/api/token-sale")
-def create_token_sale(data: TokenSaleIn):
+@limiter.limit("10/minute")
+def create_token_sale(request: Request, data: TokenSaleIn):
     sale_id = "sale_" + uuid.uuid4().hex[:12]
     ts = now()
     with db() as conn:
@@ -463,7 +656,8 @@ def create_token_sale(data: TokenSaleIn):
 
 
 @api.get("/api/token-sale/{sale_id}")
-def get_token_sale(sale_id: str):
+@limiter.limit("60/minute")
+def get_token_sale(request: Request, sale_id: str):
     with db() as conn:
         row = conn.execute("SELECT * FROM token_sales WHERE sale_id=?", (sale_id,)).fetchone()
     if not row:
@@ -476,7 +670,8 @@ def get_token_sale(sale_id: str):
 
 
 @api.post("/api/token-sale/calculate")
-def calculate_contribution(data: ContributionIn):
+@limiter.limit("60/minute")
+def calculate_contribution(request: Request, data: ContributionIn):
     with db() as conn:
         sale = conn.execute("SELECT * FROM token_sales WHERE sale_id=?", (data.sale_id,)).fetchone()
     if not sale:
@@ -506,26 +701,26 @@ def calculate_contribution(data: ContributionIn):
 
 
 @api.post("/api/token-sale/contribute")
-def record_contribution(data: ContributionIn):
-    with db() as conn:
+@limiter.limit("30/minute")
+def record_contribution(request: Request, data: ContributionIn):
+    with db_tx() as conn:
         sale = conn.execute("SELECT * FROM token_sales WHERE sale_id=? AND status='active'", (data.sale_id,)).fetchone()
-    if not sale:
-        raise HTTPException(404, "Active sale not found")
-    sale = dict(sale)
-    amount_usd = data.amount * data.sol_usd_rate if data.currency.upper() == "SOL" else data.amount
-    current_price = _curve_price(sale["total_sold"], sale["max_supply"], sale["initial_price"])
-    bonus_pct = _decay_bonus_pct(sale["max_bonus_pct"], sale["decay_lambda"], sale["total_sold"], sale["max_supply"])
-    base_tokens = amount_usd / current_price if current_price > 0 else 0.0
-    bonus_tokens = base_tokens * bonus_pct
-    total_tokens = base_tokens + bonus_tokens
-    split_treasury = amount_usd * 0.80
-    split_protocol = amount_usd * 0.10
-    split_validator = amount_usd * 0.05
-    split_reward_pool = amount_usd * 0.05
-    contribution_id = "ctr_" + uuid.uuid4().hex[:12]
-    ts = now()
-    receipt_hash = _contribution_receipt_hash(contribution_id, data.sale_id, data.buyer_wallet, total_tokens, ts)
-    with db() as conn:
+        if not sale:
+            raise HTTPException(404, "Active sale not found")
+        sale = dict(sale)
+        amount_usd = data.amount * data.sol_usd_rate if data.currency.upper() == "SOL" else data.amount
+        current_price = _curve_price(sale["total_sold"], sale["max_supply"], sale["initial_price"])
+        bonus_pct = _decay_bonus_pct(sale["max_bonus_pct"], sale["decay_lambda"], sale["total_sold"], sale["max_supply"])
+        base_tokens = amount_usd / current_price if current_price > 0 else 0.0
+        bonus_tokens = base_tokens * bonus_pct
+        total_tokens = base_tokens + bonus_tokens
+        split_treasury = amount_usd * 0.80
+        split_protocol = amount_usd * 0.10
+        split_validator = amount_usd * 0.05
+        split_reward_pool = amount_usd * 0.05
+        contribution_id = "ctr_" + uuid.uuid4().hex[:12]
+        ts = now()
+        receipt_hash = _contribution_receipt_hash(contribution_id, data.sale_id, data.buyer_wallet, total_tokens, ts)
         position = (conn.execute("SELECT COUNT(*) FROM contributions WHERE sale_id=?", (data.sale_id,)).fetchone()[0] or 0) + 1
         conn.execute(
             "INSERT INTO contributions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -538,6 +733,7 @@ def record_contribution(data: ContributionIn):
             "UPDATE token_sales SET total_raised=total_raised+?, total_sold=total_sold+?, reward_pool_balance=reward_pool_balance+? WHERE sale_id=?",
             (amount_usd, total_tokens, split_reward_pool, data.sale_id),
         )
+        conn.commit()
     return {
         "contribution_id": contribution_id,
         "position": position,
@@ -556,7 +752,8 @@ def record_contribution(data: ContributionIn):
 
 
 @api.get("/api/token-sale/{sale_id}/receipt/{contribution_id}")
-def get_receipt(sale_id: str, contribution_id: str):
+@limiter.limit("60/minute")
+def get_receipt(request: Request, sale_id: str, contribution_id: str):
     with db() as conn:
         row = conn.execute(
             "SELECT * FROM contributions WHERE contribution_id=? AND sale_id=?",
@@ -568,8 +765,9 @@ def get_receipt(sale_id: str, contribution_id: str):
 
 
 @api.post("/api/token-sale/claim")
-def submit_claim(data: RebateClaimIn):
-    with db() as conn:
+@limiter.limit("30/minute")
+def submit_claim(request: Request, data: RebateClaimIn):
+    with db_tx() as conn:
         ctr = conn.execute(
             "SELECT * FROM contributions WHERE contribution_id=? AND sale_id=? AND buyer_wallet=?",
             (data.contribution_id, data.sale_id, data.buyer_wallet),
@@ -599,6 +797,7 @@ def submit_claim(data: RebateClaimIn):
             "UPDATE token_sales SET reward_pool_balance=reward_pool_balance-? WHERE sale_id=?",
             (claim_amount, data.sale_id),
         )
+        conn.commit()
     return {
         "claim_id": claim_id,
         "claim_amount": claim_amount,
@@ -608,7 +807,8 @@ def submit_claim(data: RebateClaimIn):
 
 
 @api.get("/api/token-sale/{sale_id}/claims")
-def list_claims(sale_id: str):
+@limiter.limit("60/minute")
+def list_claims(request: Request, sale_id: str):
     with db() as conn:
         rows = conn.execute(
             "SELECT * FROM rebate_claims WHERE sale_id=? ORDER BY created_at DESC",
@@ -617,19 +817,18 @@ def list_claims(sale_id: str):
     return {"claims": [dict(r) for r in rows]}
 
 
-_ADMIN_KEY = os.getenv("ADMIN_API_KEY", "")
-
-
 def _verify_admin(key: str) -> None:
-    if _ADMIN_KEY and key != _ADMIN_KEY:
+    if not _ADMIN_KEY:
+        raise HTTPException(403, "Admin API key not configured")
+    if key != _ADMIN_KEY:
         raise HTTPException(403, "invalid admin key")
 
 
 @api.post("/api/rebase/trigger")
-def trigger_rebase(data: RebaseTriggerIn):
-    import random
+@limiter.limit("10/minute")
+def trigger_rebase(request: Request, data: RebaseTriggerIn):
     _verify_admin(data.admin_key)
-    with db() as conn:
+    with db_tx() as conn:
         sale = conn.execute("SELECT * FROM token_sales WHERE sale_id=?", (data.sale_id,)).fetchone()
         if not sale:
             raise HTTPException(404, "Sale not found")
@@ -695,6 +894,7 @@ def trigger_rebase(data: RebaseTriggerIn):
              holder_count, len(selected), mult, total_bonus,
              total_supply_before, total_supply_after, ts),
         )
+        conn.commit()
 
     return {
         "epoch_id": epoch_id,
@@ -714,7 +914,8 @@ def trigger_rebase(data: RebaseTriggerIn):
 
 
 @api.get("/api/rebase/{sale_id}/state")
-def rebase_state(sale_id: str):
+@limiter.limit("60/minute")
+def rebase_state(request: Request, sale_id: str):
     with db() as conn:
         last = conn.execute(
             "SELECT * FROM rebase_epochs WHERE sale_id=? ORDER BY triggered_at DESC LIMIT 1",
@@ -738,7 +939,10 @@ def rebase_state(sale_id: str):
 
 
 @api.get("/api/rebase/{sale_id}/history")
-def rebase_history(sale_id: str, limit: int = 20):
+@limiter.limit("60/minute")
+def rebase_history(request: Request, sale_id: str, limit: int = 20):
+    if limit < 1 or limit > 100:
+        raise HTTPException(422, "limit must be between 1 and 100")
     with db() as conn:
         rows = conn.execute(
             "SELECT * FROM rebase_epochs WHERE sale_id=? ORDER BY epoch_number DESC LIMIT ?",
@@ -748,7 +952,8 @@ def rebase_history(sale_id: str, limit: int = 20):
 
 
 @api.get("/api/rebase/{sale_id}/wallet/{wallet}")
-def wallet_rebase_events(sale_id: str, wallet: str):
+@limiter.limit("60/minute")
+def wallet_rebase_events(request: Request, sale_id: str, wallet: str):
     with db() as conn:
         rows = conn.execute(
             "SELECT * FROM holder_rebase_events WHERE sale_id=? AND wallet=? ORDER BY created_at DESC",
@@ -764,18 +969,103 @@ def wallet_rebase_events(sale_id: str, wallet: str):
     }
 
 
+@api.get("/api/export/db")
+@limiter.limit("5/minute")
+def export_db(request: Request, key: str = Header(default="")):
+    _verify_admin(key)
+    path = str(DB_PATH)
+    import shutil
+    backup_path = f"/tmp/membra_backup_{int(time.time())}.sqlite3"
+    shutil.copy(path, backup_path)
+    from fastapi.responses import FileResponse
+    return FileResponse(backup_path, filename="membra_backup.sqlite3", media_type="application/octet-stream")
+
+
+# ── LLM Inference (Pollinations AI proxy — free, no API key) ─────────────────
+class LLMIn(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=8192)
+    model: str = Field(default="openai", max_length=64)
+    system_prompt: str | None = Field(default=None, max_length=2048)
+
+
+@api.post("/api/llm/inference")
+@limiter.limit("30/minute")
+def llm_inference(request: Request, data: LLMIn):
+    """Proxy inference to Pollinations AI — free, anonymous, no API key."""
+    import urllib.request
+    import urllib.parse
+
+    conversation = data.prompt
+    if data.system_prompt:
+        conversation = f"System: {data.system_prompt}\n\nUser: {data.prompt}"
+    else:
+        conversation = f"User: {data.prompt}"
+
+    encoded = urllib.parse.quote(conversation)
+    url = f"https://text.pollinations.ai/{encoded}?model={urllib.parse.quote(data.model)}&seed={int(time.time())}"
+
+    try:
+        req = urllib.request.Request(url, method="GET", headers={"Accept": "text/plain", "User-Agent": "MEMBRA-QR-Gateway/1.2"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            text = resp.read().decode("utf-8")
+        return {"response": text.strip(), "model": data.model, "source": "pollinations"}
+    except urllib.error.HTTPError as exc:
+        logger.error("LLM proxy HTTP error: %s", exc.code)
+        raise HTTPException(502, f"LLM provider error: {exc.code}")
+    except Exception as exc:
+        logger.error("LLM proxy error: %s", exc)
+        raise HTTPException(502, f"LLM inference failed: {exc}")
+
+
+# ── Metrics ───────────────────────────────────────────────────────────────────
+_metrics = {"requests_total": 0, "requests_4xx": 0, "requests_5xx": 0, "requests_latency_ms_sum": 0.0}
+
+
+@api.get("/api/metrics")
+@limiter.limit("60/minute")
+def metrics(request: Request):
+    rows = {
+        "requests_total": _metrics["requests_total"],
+        "requests_4xx": _metrics["requests_4xx"],
+        "requests_5xx": _metrics["requests_5xx"],
+        "requests_latency_ms_avg": round(_metrics["requests_latency_ms_sum"] / max(_metrics["requests_total"], 1), 2),
+        "app": APP_NAME,
+        "version": APP_VERSION,
+        "env": _ENV,
+    }
+    return rows
+
+
+@api.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    dur = (time.time() - start) * 1000
+    _metrics["requests_total"] += 1
+    _metrics["requests_latency_ms_sum"] += dur
+    if 400 <= response.status_code < 500:
+        _metrics["requests_4xx"] += 1
+    elif response.status_code >= 500:
+        _metrics["requests_5xx"] += 1
+    return response
+
+
 # ── CORS + startup ────────────────────────────────────────────────────────────
 from fastapi.middleware.cors import CORSMiddleware
 
+allow_origins = CORS_ORIGINS if CORS_ORIGINS else (["*"] if not _PRODUCTION else [])
+if _PRODUCTION and not allow_origins:
+    logger.warning("CORS_ORIGINS not set in production; CORS will be disabled")
+
 api.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allow_origins,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )
 
 app = api
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "7860")))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "7860")), log_level="info")

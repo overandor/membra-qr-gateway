@@ -27,6 +27,12 @@ export const USER_STAKE_SEED = Buffer.from("user_stake");
 export const LOCK_RECORD_SEED = Buffer.from("lock_record");
 export const GOVERNANCE_SEED = Buffer.from("governance");
 export const PROPOSAL_SEED = Buffer.from("proposal");
+export const PROMPT_ASSET_SEED = Buffer.from("prompt_asset");
+export const INFERENCE_REQUEST_SEED = Buffer.from("inference_request");
+export const INFERENCE_RESPONSE_SEED = Buffer.from("inference_response");
+export const MERKLE_TREE_SEED = Buffer.from("merkle_tree");
+export const LLM_CONFIG_SEED = Buffer.from("llm_config");
+export const TOKEN_CONFIG_SEED = Buffer.from("token_config");
 
 // Attestation PDA seeds (matching state.rs comments)
 export const ATTESTATION_SEEDS = {

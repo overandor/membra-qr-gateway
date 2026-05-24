@@ -124,4 +124,120 @@ Recommended company visual language:
 
 ## Status
 
-Frontend prototype package. Highest priority is connecting it to `Membra_ads` and `Membra_demo_data` to create a clean buyer-facing demo.
+Frontend + backend integrated. Production-hardened with rate limiting, circuit breakers, structured logging, and CI/CD.
+
+---
+
+## Quick Start
+
+```bash
+# Install everything
+make install
+
+# Run checks
+make lint
+make test
+
+# Start dev servers
+make backend   # http://localhost:7860
+make frontend  # http://localhost:3000
+```
+
+## Environment Setup
+
+```bash
+cp .env.example .env
+# Edit .env with your secrets
+```
+
+### Required in Production
+
+| Variable | Purpose |
+|---|---|
+| `ADMIN_API_KEY` | Protects rebase trigger and admin endpoints |
+| `MEMBRA_EVENT_SECRET` | HMAC verification for canonical MEMBRA events |
+| `CORS_ORIGINS` | Comma-separated allowlist (e.g. `https://app.membra.network`) |
+
+### Optional
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ENV` | `development` | Set to `production` to enable strict checks |
+| `PORT` | `7860` | Backend listen port |
+| `DB_PATH` | `/tmp/...` | SQLite database file path |
+| `STRIPE_SECRET_KEY` | — | Stripe checkout integration |
+
+## API Reference
+
+| Endpoint | Method | Rate Limit | Description |
+|---|---|---|---|
+| `/api/health` | GET | 30/min | Liveness probe |
+| `/api/ready` | GET | 30/min | Readiness + artifact/event counts |
+| `/api/metrics` | GET | 60/min | Prometheus-compatible request metrics |
+| `/api/artifacts` | GET | 60/min | List artifacts |
+| `/api/artifacts` | POST | 10/min | Create artifact |
+| `/api/token-sale` | POST | 10/min | Create token sale |
+| `/api/token-sale/contribute` | POST | 30/min | Record contribution |
+| `/api/rebase/trigger` | POST | 10/min | Trigger rebase epoch (admin only) |
+| `/api/rebase/{sale_id}/state` | GET | 60/min | Current rebase state |
+| `/api/export/db` | GET | 5/min | Download SQLite backup (admin only) |
+
+All endpoints return `X-Request-ID` headers for tracing.
+
+## Production Deployment
+
+### 1. Docker
+
+```bash
+make docker        # Build and start
+make docker-down   # Stop
+```
+
+### 2. Manual (systemd)
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn app:app --host 0.0.0.0 --port 7860 --workers 2
+```
+
+### 3. Nginx Reverse Proxy
+
+See `nginx.conf.example` for a production-ready config with:
+- Security headers
+- Keepalive upstream connections
+- Rate limiting zones (enable in nginx.conf)
+
+## Security Checklist
+
+- [ ] `ENV=production` is set
+- [ ] `ADMIN_API_KEY` is generated (`openssl rand -hex 32`)
+- [ ] `MEMBRA_EVENT_SECRET` is configured
+- [ ] `CORS_ORIGINS` is locked to exact domains
+- [ ] Stripe webhooks use `whsec_` signing secret
+- [ ] Database directory has correct filesystem permissions
+- [ ] Nginx or Cloudflare handles TLS termination
+- [ ] Logs are forwarded to a centralized aggregator (JSON format)
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   React     │────▶│   Nginx      │────▶│  FastAPI    │
+│  (Vite)     │     │ (SSL/WAF)    │     │  Backend    │
+└─────────────┘     └──────────────┘     └─────────────┘
+                                                  │
+                                           ┌──────┴──────┐
+                                           │   SQLite    │
+                                           │  (WAL mode) │
+                                           └─────────────┘
+```
+
+## CI/CD
+
+GitHub Actions workflow in `.github/workflows/ci.yml`:
+- Backend: `py_compile` + `pytest`
+- Frontend: `npm ci` + `npm run build`
+
+## License
+
+Proprietary — MEMBRA Labs
