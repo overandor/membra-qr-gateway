@@ -1,0 +1,129 @@
+---
+# ── API NetworkPolicy ──────────────────────────────────────────────────────────
+# API pods: accept ingress only from nginx ingress controller and workers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: membra-api-network-policy
+  namespace: membra
+  labels:
+    app.kubernetes.io/name: membra
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: membra-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # From nginx ingress controller (typically in ingress-nginx namespace)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 7860
+    # From worker pods in same namespace
+    - from:
+        - podSelector:
+            matchLabels:
+              app: membra-worker
+      ports:
+        - protocol: TCP
+          port: 7860
+    # Prometheus scraping (from monitoring namespace)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 7860
+  egress:
+    # DNS resolution
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Solana RPC (outbound HTTPS)
+    - ports:
+        - protocol: TCP
+          port: 443
+    # Stripe API (outbound HTTPS)
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
+# ── Worker NetworkPolicy ───────────────────────────────────────────────────────
+# Workers: can only call the API and external HTTPS (Solana RPC)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: membra-worker-network-policy
+  namespace: membra
+spec:
+  podSelector:
+    matchLabels:
+      app: membra-worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # No inbound connections allowed for workers
+    []
+  egress:
+    # DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # API service (internal)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: membra-api
+      ports:
+        - protocol: TCP
+          port: 7860
+    # Solana RPC (external HTTPS)
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
+# ── Frontend NetworkPolicy ─────────────────────────────────────────────────────
+# Frontend: accept only from ingress controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: membra-frontend-network-policy
+  namespace: membra
+spec:
+  podSelector:
+    matchLabels:
+      app: membra-frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Frontend nginx server does not make outbound connections
+    []

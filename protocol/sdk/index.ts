@@ -3,12 +3,16 @@
  * Top-level re-export.
  *
  * Usage:
- *   import { MembraIDO, MembraRebase, MembraRewards, MembraGovernance } from "@membra/protocol-sdk";
+ *   import { MembraClient, AttestationClient, ReceiptClient, parseAnchorError } from "@membra/protocol-sdk";
  */
 
 export * from "./ido";
 export * from "./rebase";
 export * from "./rewards";
 export * from "./governance";
+export * from "./attestation";
+export * from "./receipts";
+export * from "./client";
+export * from "./errors";
 export * from "./types";
 export * from "./constants";
