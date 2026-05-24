@@ -64,3 +64,25 @@ pub struct CircuitBreakerTripped {
     pub volatility_bps: u64,
     pub ts: i64,
 }
+
+/// Emitted when a user deposits tokens and receives shares.
+#[event]
+pub struct TokensDeposited {
+    pub user: Pubkey,
+    /// Raw token amount deposited.
+    pub amount: u64,
+    /// Shares minted (= amount * REBASE_INDEX_ONE / global_rebase_index).
+    pub shares: u128,
+    pub global_rebase_index: u128,
+}
+
+/// Emitted when a user burns shares and receives tokens.
+#[event]
+pub struct TokensWithdrawn {
+    pub user: Pubkey,
+    /// Shares burned.
+    pub shares: u128,
+    /// Raw token amount returned (= shares * global_rebase_index / REBASE_INDEX_ONE).
+    pub tokens_returned: u64,
+    pub global_rebase_index: u128,
+}

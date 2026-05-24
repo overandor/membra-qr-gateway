@@ -101,6 +101,13 @@ pub fn handler(
         IdoError::Unauthorized
     );
 
+    // Token vault must already be funded with at least hard_cap_tokens so that
+    // every buyer who reaches finalization can claim without a runtime shortfall.
+    require!(
+        ctx.accounts.token_vault.amount >= hard_cap_tokens,
+        IdoError::InvalidVault
+    );
+
     let config = &mut ctx.accounts.ido_config;
     let bump = ctx.bumps.ido_config;
 

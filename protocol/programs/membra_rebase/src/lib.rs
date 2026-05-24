@@ -46,6 +46,10 @@ pub mod events;
 pub mod instructions;
 pub mod state;
 
+#[allow(ambiguous_glob_reexports)]
+pub use instructions::deposit::*;
+#[allow(ambiguous_glob_reexports)]
+pub use instructions::withdraw::*;
 use instructions::*;
 
 declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkh476zPFsLnS");
@@ -139,5 +143,27 @@ pub mod membra_rebase {
         args: UpdateRebaseParamsArgs,
     ) -> Result<()> {
         instructions::update_rebase_params::handler(ctx, args)
+    }
+
+    // ─── Deposit / Withdraw ───────────────────────────────────────────────────
+
+    /// Deposit tokens into the rebase vault and receive proportional shares.
+    ///
+    /// `shares = amount * REBASE_INDEX_ONE / global_rebase_index`
+    ///
+    /// At index 1.0 shares equal deposited tokens; as the index grows, each token
+    /// yields fewer shares (reflecting appreciation of existing share holders).
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+        instructions::deposit::handler(ctx, amount)
+    }
+
+    /// Burn shares and receive the proportional token amount back.
+    ///
+    /// `tokens = shares * global_rebase_index / REBASE_INDEX_ONE`
+    ///
+    /// If the index has risen since deposit the user receives more tokens than
+    /// they deposited; if it contracted they receive fewer.
+    pub fn withdraw(ctx: Context<Withdraw>, shares: u128) -> Result<()> {
+        instructions::withdraw::handler(ctx, shares)
     }
 }
