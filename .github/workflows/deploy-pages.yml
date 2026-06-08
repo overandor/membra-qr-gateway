@@ -48,13 +48,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Auto-enables Pages (build type: GitHub Actions) using the built-in
-      # token, so no manual Settings -> Pages toggle is required.
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
       - name: Build (Pages subpath base)
         env:
           # Project Pages sites are served from /<repo>/, so assets must be
