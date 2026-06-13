@@ -194,6 +194,7 @@ pub fn handler(ctx: Context<UpdateSwitchboardPrice>) -> Result<()> {
     }
 
     // ─── Commit ──────────────────────────────────────────────────────────────
+    rebase_state.record_price_observation(price_usd_6, clock.unix_timestamp);
     rebase_state.last_oracle_price_usd_6 = price_usd_6;
     rebase_state.last_oracle_update_ts = clock.unix_timestamp;
 

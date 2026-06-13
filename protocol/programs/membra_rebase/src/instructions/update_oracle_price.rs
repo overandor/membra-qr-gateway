@@ -123,6 +123,7 @@ pub fn handler(
     }
 
     // ─── Commit price ────────────────────────────────────────────────────────
+    rebase_state.record_price_observation(new_price_usd_6, clock.unix_timestamp);
     rebase_state.last_oracle_price_usd_6 = new_price_usd_6;
     rebase_state.last_oracle_update_ts = clock.unix_timestamp;
 
