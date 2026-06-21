@@ -1,7 +1,12 @@
 use anchor_lang::prelude::*;
 
+use crate::errors::RebaseError;
+
 /// The initial value of `global_rebase_index` representing 1.0 (i.e. 1e12).
 pub const REBASE_INDEX_ONE: u128 = 1_000_000_000_000u128;
+
+/// Number of oracle price observations retained for TWAP computation.
+pub const PRICE_HISTORY_LEN: usize = 8;
 
 /// Oracle source identifiers.
 pub const ORACLE_SOURCE_PYTH: u8 = 0;
@@ -21,6 +26,16 @@ pub const BPS_DENOM: i128 = 10_000i128;
 /// A value of 10 means confidence < price / 10 (i.e. < 10% of price).
 pub const CONF_RATIO_DENOM: u64 = 10;
 
+/// A single oracle price observation, used to compute the time-weighted
+/// average price (TWAP) over the retained window in `RebaseState.price_history`.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
+pub struct PriceObservation {
+    /// Price in USD with 6 decimal places.
+    pub price_usd_6: u64,
+    /// Unix timestamp (on-chain clock) when this observation was recorded.
+    pub ts: i64,
+}
+
 /// Global singleton that records all rebase configuration and accumulated state.
 ///
 /// Space breakdown (discriminator = 8):
@@ -33,9 +48,11 @@ pub const CONF_RATIO_DENOM: u64 = 10;
 ///   u64 (volatility)   =   8
 ///   i64 (stale_thresh) =   8
 ///   bool (paused)      =   1
+///   price_history      = 128  (PRICE_HISTORY_LEN=8 × 16 bytes per PriceObservation)
+///   u8 ×2              =   2   (price_history_idx, price_history_count)
 ///   u8  (bump)         =   1
-///   padding            =   8  (align + future)
-///   Total + discriminator ≈ 323 → use 400 for safety
+///   padding            =  16  (align + future)
+///   Total + discriminator ≈ 437 → see `LEN` for exact figure
 #[account]
 #[derive(Default)]
 pub struct RebaseState {
@@ -106,6 +123,16 @@ pub struct RebaseState {
     /// Most recently confirmed oracle price (USD, 6 decimals).
     pub last_oracle_price_usd_6: u64,
 
+    /// Ring buffer of recent oracle price observations, used to compute a
+    /// time-weighted average price (TWAP) in `compute_twap`.
+    pub price_history: [PriceObservation; PRICE_HISTORY_LEN],
+
+    /// Index of the next slot to write in `price_history`.
+    pub price_history_idx: u8,
+
+    /// Number of valid entries in `price_history` (saturates at `PRICE_HISTORY_LEN`).
+    pub price_history_count: u8,
+
     /// PDA bump for this account.
     pub bump: u8,
 }
@@ -135,8 +162,84 @@ impl RebaseState {
         + 8    // volatility_circuit_breaker_bps
         + 8    // last_oracle_update_ts
         + 8    // last_oracle_price_usd_6
+        + (16 * PRICE_HISTORY_LEN)  // price_history ([PriceObservation; 8] @ 16 bytes each)
+        + 1    // price_history_idx
+        + 1    // price_history_count
         + 1    // bump
-        + 32;  // padding / future fields
+        + 24;  // padding / future fields
+
+    /// Record a new oracle price observation into the ring buffer, overwriting
+    /// the oldest entry once `PRICE_HISTORY_LEN` observations have accumulated.
+    pub fn record_price_observation(&mut self, price_usd_6: u64, ts: i64) {
+        let idx = self.price_history_idx as usize;
+        self.price_history[idx] = PriceObservation { price_usd_6, ts };
+        self.price_history_idx = ((idx + 1) % PRICE_HISTORY_LEN) as u8;
+        if (self.price_history_count as usize) < PRICE_HISTORY_LEN {
+            self.price_history_count += 1;
+        }
+    }
+
+    /// Compute the time-weighted average price over the retained observation
+    /// window. Each observation is weighted by the number of seconds it was
+    /// "current" (i.e. the time until the next observation, or until `now`
+    /// for the most recent one).
+    ///
+    /// Falls back to `last_oracle_price_usd_6` if no observations have been
+    /// recorded yet, and to the most recent observation's price if the total
+    /// elapsed weight is zero (e.g. all observations share the same timestamp).
+    pub fn compute_twap(&self, now: i64) -> Result<u64> {
+        let count = self.price_history_count as usize;
+        if count == 0 {
+            return Ok(self.last_oracle_price_usd_6);
+        }
+
+        let len = PRICE_HISTORY_LEN;
+        // When the buffer is full, `price_history_idx` points at the oldest
+        // entry (the next slot to be overwritten). Otherwise entries start at 0.
+        let oldest_idx = if count == len {
+            self.price_history_idx as usize
+        } else {
+            0
+        };
+
+        let mut weighted_sum: u128 = 0;
+        let mut total_weight: u128 = 0;
+
+        for i in 0..count {
+            let idx = (oldest_idx + i) % len;
+            let obs = &self.price_history[idx];
+
+            let interval_end = if i + 1 < count {
+                let next_idx = (oldest_idx + i + 1) % len;
+                self.price_history[next_idx].ts
+            } else {
+                now
+            };
+
+            let dt = interval_end
+                .checked_sub(obs.ts)
+                .ok_or(RebaseError::ArithmeticOverflow)?
+                .max(0) as u128;
+
+            weighted_sum = weighted_sum
+                .checked_add(
+                    (obs.price_usd_6 as u128)
+                        .checked_mul(dt)
+                        .ok_or(RebaseError::ArithmeticOverflow)?,
+                )
+                .ok_or(RebaseError::ArithmeticOverflow)?;
+            total_weight = total_weight
+                .checked_add(dt)
+                .ok_or(RebaseError::ArithmeticOverflow)?;
+        }
+
+        if total_weight == 0 {
+            let newest_idx = (oldest_idx + count - 1) % len;
+            return Ok(self.price_history[newest_idx].price_usd_6);
+        }
+
+        u64::try_from(weighted_sum / total_weight).map_err(|_| error!(RebaseError::ArithmeticOverflow))
+    }
 }
 
 /// Per-user account tracking share balance within the rebase wrapper.

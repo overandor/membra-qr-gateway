@@ -79,10 +79,10 @@ pub fn handler(ctx: Context<ExecuteRebase>) -> Result<()> {
     );
 
     // ─── Gate 4: volatility circuit breaker ──────────────────────────────────
-    // Compare the current confirmed oracle price against the TWAP used in the
-    // previous epoch.  On the first ever rebase there is no previous TWAP so we
-    // skip this check.
-    let twap_price_usd_6 = rebase_state.last_oracle_price_usd_6;
+    // Compare this epoch's time-weighted average price against the TWAP used in
+    // the previous epoch.  On the first ever rebase there is no previous TWAP so
+    // we skip this check.
+    let twap_price_usd_6 = rebase_state.compute_twap(clock.unix_timestamp)?;
     let prev_twap = rebase_state.last_twap_price_usd_6;
     let circuit_bps = rebase_state.volatility_circuit_breaker_bps;
 

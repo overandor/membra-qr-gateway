@@ -5,8 +5,8 @@ use crate::{
     errors::RebaseError,
     events::RebaseStateInitialized,
     state::{
-        RebaseState, ORACLE_SOURCE_MANUAL, REBASE_INDEX_ONE,
-        REBASE_STATE_SEED,
+        PriceObservation, RebaseState, ORACLE_SOURCE_MANUAL, PRICE_HISTORY_LEN,
+        REBASE_INDEX_ONE, REBASE_STATE_SEED,
     },
 };
 
@@ -153,6 +153,9 @@ pub fn handler(ctx: Context<InitializeRebase>, params: InitializeRebaseParams) -
     rebase_state.volatility_circuit_breaker_bps = params.volatility_circuit_breaker_bps;
     rebase_state.last_oracle_update_ts = 0;
     rebase_state.last_oracle_price_usd_6 = 0;
+    rebase_state.price_history = [PriceObservation::default(); PRICE_HISTORY_LEN];
+    rebase_state.price_history_idx = 0;
+    rebase_state.price_history_count = 0;
     rebase_state.bump = bump;
 
     emit!(RebaseStateInitialized {
