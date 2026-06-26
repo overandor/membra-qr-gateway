@@ -28,7 +28,7 @@ pub struct CreateMemoryCollateralReceipt<'info> {
 
 pub fn handler(
     ctx: Context<CreateMemoryCollateralReceipt>,
-    _mcr_id_hash: [u8; 32],
+    mcr_id_hash: [u8; 32],
     m5_attestation_root: [u8; 32],
 ) -> Result<()> {
     let mcr = &mut ctx.accounts.mcr;
@@ -51,6 +51,7 @@ pub fn handler(
     );
 
     mcr.owner = ctx.accounts.owner.key();
+    mcr.mcr_id_hash = mcr_id_hash;
     mcr.repo_proof = ctx.accounts.repo_proof.key();
     mcr.memory_vault = ctx.accounts.memory_vault.key();
     mcr.parent_mir = ctx.accounts.parent_mir.key();

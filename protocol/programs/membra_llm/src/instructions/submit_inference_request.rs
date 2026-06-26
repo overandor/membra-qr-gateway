@@ -72,7 +72,6 @@ pub fn handler(
 ) -> Result<()> {
     let inference_request = &mut ctx.accounts.inference_request;
     let prompt_asset_acc = &ctx.accounts.prompt_asset;
-    let token_config = &ctx.accounts.token_config;
     let clock = Clock::get()?;
     
     // Validate model ID

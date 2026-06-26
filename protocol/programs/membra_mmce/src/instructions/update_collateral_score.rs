@@ -9,7 +9,7 @@ pub struct UpdateCollateralScore<'info> {
 
     #[account(
         mut,
-        seeds = [b"mcr", mcr.owner.as_ref(), &mcr.key().to_bytes()[..32]],
+        seeds = [b"mcr", mcr.owner.as_ref(), &mcr.mcr_id_hash],
         bump = mcr.bump,
         constraint = mcr.owner == owner.key() @ crate::errors::MmceError::Unauthorized
     )]
