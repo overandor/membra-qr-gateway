@@ -7,6 +7,7 @@ use crate::errors::LlmError;
 use crate::events::PromptAssetCreated;
 
 #[derive(Accounts)]
+#[instruction(prompt_hash: [u8; 32])]
 pub struct CreatePromptAsset<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
