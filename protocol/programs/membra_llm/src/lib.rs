@@ -5,11 +5,11 @@ pub mod events;
 pub mod instructions;
 pub mod state;
 
-pub use instructions::create_prompt_asset::*;
-pub use instructions::submit_inference_request::*;
-pub use instructions::record_inference_response::*;
-pub use instructions::verify_merkle_proof::*;
-pub use instructions::update_prompt_metadata::*;
+pub use instructions::create_prompt_asset::CreatePromptAsset;
+pub use instructions::submit_inference_request::SubmitInferenceRequest;
+pub use instructions::record_inference_response::RecordInferenceResponse;
+pub use instructions::verify_merkle_proof::VerifyMerkleProof;
+pub use instructions::update_prompt_metadata::UpdatePromptMetadata;
 
 declare_id!("MeLM111111111111111111111111111111111111111");
 

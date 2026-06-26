@@ -28,7 +28,7 @@ pub struct CreateMemoryCollateralReceipt<'info> {
 
 pub fn handler(
     ctx: Context<CreateMemoryCollateralReceipt>,
-    mcr_id_hash: [u8; 32],
+    _mcr_id_hash: [u8; 32],
     m5_attestation_root: [u8; 32],
 ) -> Result<()> {
     let mcr = &mut ctx.accounts.mcr;

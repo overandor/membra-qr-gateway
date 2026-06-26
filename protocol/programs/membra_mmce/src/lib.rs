@@ -5,13 +5,14 @@ pub mod events;
 pub mod instructions;
 pub mod state;
 
-pub use instructions::initialize_memory_vault::*;
-pub use instructions::register_repo_proof::*;
-pub use instructions::create_mir::*;
-pub use instructions::attest_mir::*;
-pub use instructions::create_memory_collateral_receipt::*;
-pub use instructions::update_collateral_score::*;
-pub use instructions::revoke_collateral_receipt::*;
+pub use instructions::initialize_memory_vault::InitializeMemoryVault;
+pub use instructions::register_repo_proof::RegisterRepoProof;
+pub use instructions::create_mir::CreateMir;
+pub use instructions::attest_mir::AttestMir;
+pub use instructions::create_memory_collateral_receipt::CreateMemoryCollateralReceipt;
+pub use instructions::update_collateral_score::UpdateCollateralScore;
+pub use instructions::revoke_collateral_receipt::RevokeCollateralReceipt;
+pub use state::VisibilityClass;
 
 declare_id!("MmCe111111111111111111111111111111111111111");
 
