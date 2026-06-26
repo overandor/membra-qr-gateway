@@ -108,7 +108,7 @@ export function findPromptAssetPda(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("prompt_asset"), owner.toBuffer(), promptHash],
-    new PublicKey("MlLm111111111111111111111111111111111111111")
+    new PublicKey("MeLM111111111111111111111111111111111111111")
   );
 }
 
@@ -124,7 +124,7 @@ export function findInferenceRequestPda(
       submitter.toBuffer(),
       Buffer.from(timestamp.toString()),
     ],
-    new PublicKey("MlLm111111111111111111111111111111111111111")
+    new PublicKey("MeLM111111111111111111111111111111111111111")
   );
 }
 
@@ -133,7 +133,7 @@ export function findInferenceResponsePda(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("inference_response"), inferenceRequest.toBuffer()],
-    new PublicKey("MlLm111111111111111111111111111111111111111")
+    new PublicKey("MeLM111111111111111111111111111111111111111")
   );
 }
 
@@ -142,20 +142,20 @@ export function findMerkleTreePda(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("merkle_tree"), inferenceRequest.toBuffer()],
-    new PublicKey("MlLm111111111111111111111111111111111111111")
+    new PublicKey("MeLM111111111111111111111111111111111111111")
   );
 }
 
 export function findLlmConfigPda(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("llm_config")],
-    new PublicKey("MlLm111111111111111111111111111111111111111")
+    new PublicKey("MeLM111111111111111111111111111111111111111")
   );
 }
 
 export function findTokenConfigPda(): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("token_config")],
-    new PublicKey("MlLm111111111111111111111111111111111111111")
+    new PublicKey("MeLM111111111111111111111111111111111111111")
   );
 }

@@ -18,7 +18,7 @@ pub struct VerifyMerkleProof<'info> {
     
     #[account(
         mut,
-        constraint = inference_response.verified == false @ LlmError::ResponseAlreadyVerified
+        constraint = !inference_response.verified @ LlmError::ResponseAlreadyVerified
     )]
     pub inference_response: Account<'info, InferenceResponse>,
     
@@ -90,14 +90,14 @@ fn compute_merkle_root_from_proof(
         
         // Determine if the current hash is the left or right sibling
         if current_index % 2 == 0 {
-            hasher.update(&current_hash);
+            hasher.update(current_hash);
             hasher.update(proof_element);
         } else {
             hasher.update(proof_element);
-            hasher.update(&current_hash);
+            hasher.update(current_hash);
         }
-        
-        current_hash = hasher.finalize().try_into().map_err(|_| LlmError::InvalidMerkleProof)?;
+
+        current_hash = hasher.finalize().into();
         current_index /= 2;
     }
     

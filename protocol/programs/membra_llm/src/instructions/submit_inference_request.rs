@@ -34,7 +34,7 @@ pub struct SubmitInferenceRequest<'info> {
         init,
         payer = submitter,
         space = 8 + 32 + 32 + 64 + 256 + 1 + 9 + 8 + 8 + 9 + 1,
-        seeds = [b"inference_request", prompt_asset.key().as_ref(), submitter.key().as_ref(), &clock::Clock::get().unwrap().unix_timestamp.to_le_bytes()],
+        seeds = [b"inference_request", prompt_asset.key().as_ref(), submitter.key().as_ref(), &Clock::get().unwrap().unix_timestamp.to_le_bytes()],
         bump
     )]
     pub inference_request: Account<'info, InferenceRequest>,
@@ -72,7 +72,6 @@ pub fn handler(
 ) -> Result<()> {
     let inference_request = &mut ctx.accounts.inference_request;
     let prompt_asset_acc = &ctx.accounts.prompt_asset;
-    let token_config = &ctx.accounts.token_config;
     let clock = Clock::get()?;
     
     // Validate model ID

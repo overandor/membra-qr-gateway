@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, TokenAccount, MintTo};
+use anchor_spl::token::{Token, TokenAccount, Mint, MintTo};
 use anchor_spl::token::mint_to;
 
 use crate::state::{InferenceRequest, InferenceResponse, MerkleTree, LlmConfig, TokenConfig, InferenceStatus};

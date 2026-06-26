@@ -1,20 +1,16 @@
 use anchor_lang::prelude::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VisibilityClass {
     Public,
+    #[default]
     Private,
     LocalOnly,
 }
 
-impl Default for VisibilityClass {
-    fn default() -> Self {
-        VisibilityClass::Private
-    }
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CollateralStatus {
+    #[default]
     Created,
     RepoHashed,
     MemoryBound,
@@ -30,12 +26,6 @@ pub enum CollateralStatus {
     Reappraised,
     Escrowed,
     Licensed,
-}
-
-impl Default for CollateralStatus {
-    fn default() -> Self {
-        CollateralStatus::Created
-    }
 }
 
 #[account]
@@ -137,6 +127,7 @@ impl MIRReceipt {
 #[derive(Default)]
 pub struct MemoryCollateralReceipt {
     pub owner: Pubkey,
+    pub mcr_id_hash: [u8; 32],
     pub repo_proof: Pubkey,
     pub memory_vault: Pubkey,
     pub parent_mir: Pubkey,
@@ -153,6 +144,7 @@ pub struct MemoryCollateralReceipt {
 
 impl MemoryCollateralReceipt {
     pub const LEN: usize = 8
+        + 32
         + 32
         + 32
         + 32

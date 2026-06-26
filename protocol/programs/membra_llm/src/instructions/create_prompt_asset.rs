@@ -1,24 +1,31 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, TokenAccount, Mint, MintTo};
+use anchor_spl::token::{Token, TokenAccount, Mint};
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::associated_token::AssociatedToken as AssociatedTokenProgram;
 
-use crate::state::{PromptAsset, LlmConfig};
+use crate::state::{PromptAsset, LlmConfig, TokenConfig};
 use crate::errors::LlmError;
 use crate::events::PromptAssetCreated;
 
 #[derive(Accounts)]
+#[instruction(prompt_hash: [u8; 32])]
 pub struct CreatePromptAsset<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    
+
     #[account(
         seeds = [b"llm_config"],
         bump = llm_config.bump,
         constraint = !llm_config.paused @ LlmError::ProgramPaused
     )]
     pub llm_config: Account<'info, LlmConfig>,
-    
+
+    #[account(
+        seeds = [b"token_config"],
+        bump = token_config.bump,
+        constraint = token_config.token_mint == token_mint.key() @ LlmError::InvalidAuthority
+    )]
+    pub token_config: Account<'info, TokenConfig>,
+
     #[account(
         init,
         payer = owner,
@@ -27,9 +34,9 @@ pub struct CreatePromptAsset<'info> {
         bump
     )]
     pub prompt_asset: Account<'info, PromptAsset>,
-    
+
     #[account(
-        constraint = token_mint.key() == llm_config.token_mint @ LlmError::InvalidAuthority
+        constraint = token_mint.key() == token_config.token_mint @ LlmError::InvalidAuthority
     )]
     pub token_mint: Account<'info, Mint>,
     
@@ -43,7 +50,7 @@ pub struct CreatePromptAsset<'info> {
     
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedTokenProgram>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub rent: Sysvar<'info, Rent>,
 }
 

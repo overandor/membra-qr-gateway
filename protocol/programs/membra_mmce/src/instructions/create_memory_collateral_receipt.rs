@@ -51,6 +51,7 @@ pub fn handler(
     );
 
     mcr.owner = ctx.accounts.owner.key();
+    mcr.mcr_id_hash = mcr_id_hash;
     mcr.repo_proof = ctx.accounts.repo_proof.key();
     mcr.memory_vault = ctx.accounts.memory_vault.key();
     mcr.parent_mir = ctx.accounts.parent_mir.key();
