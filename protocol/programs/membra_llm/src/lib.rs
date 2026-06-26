@@ -11,7 +11,7 @@ pub use instructions::record_inference_response::*;
 pub use instructions::verify_merkle_proof::*;
 pub use instructions::update_prompt_metadata::*;
 
-declare_id!("MlLm111111111111111111111111111111111111111");
+declare_id!("MeLM111111111111111111111111111111111111111");
 
 #[program]
 pub mod membra_llm {

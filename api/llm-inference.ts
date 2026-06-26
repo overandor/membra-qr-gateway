@@ -39,7 +39,7 @@ import {
 // Configuration
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.devnet.solana.com';
 const TOKEN_MINT = process.env.TOKEN_MINT || new PublicKey('token_mint_address');
-const MEMBRA_LLM_PROGRAM_ID = new PublicKey('MlLm111111111111111111111111111111111111111');
+const MEMBRA_LLM_PROGRAM_ID = new PublicKey('MeLM111111111111111111111111111111111111111');
 
 // Initialize connection
 const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
