@@ -1,20 +1,16 @@
 use anchor_lang::prelude::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VisibilityClass {
     Public,
+    #[default]
     Private,
     LocalOnly,
 }
 
-impl Default for VisibilityClass {
-    fn default() -> Self {
-        VisibilityClass::Private
-    }
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CollateralStatus {
+    #[default]
     Created,
     RepoHashed,
     MemoryBound,
@@ -30,12 +26,6 @@ pub enum CollateralStatus {
     Reappraised,
     Escrowed,
     Licensed,
-}
-
-impl Default for CollateralStatus {
-    fn default() -> Self {
-        CollateralStatus::Created
-    }
 }
 
 #[account]

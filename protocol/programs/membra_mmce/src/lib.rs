@@ -48,6 +48,7 @@ pub mod membra_mmce {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn register_repo_proof(
         ctx: Context<RegisterRepoProof>,
         repo_owner_hash: [u8; 32],

@@ -20,6 +20,7 @@ pub struct RegisterRepoProof<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn handler(
     ctx: Context<RegisterRepoProof>,
     repo_owner_hash: [u8; 32],

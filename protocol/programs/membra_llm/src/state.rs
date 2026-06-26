@@ -104,9 +104,10 @@ pub struct MerkleTree {
 }
 
 /// Inference status enum
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InferenceStatus {
     /// Request submitted, pending processing
+    #[default]
     Pending,
     /// Currently being processed
     Processing,
@@ -114,12 +115,6 @@ pub enum InferenceStatus {
     Completed,
     /// Request failed
     Failed,
-}
-
-impl Default for InferenceStatus {
-    fn default() -> Self {
-        InferenceStatus::Pending
-    }
 }
 
 /// Token Mint Config - configuration for the inference token
