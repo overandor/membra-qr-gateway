@@ -82,6 +82,7 @@ jobs:
           path: |
             protocol/target/idl/
             protocol/target/types/
+            protocol/target/deploy/
 
   # ── TypeScript type-check ────────────────────────────────────────────────
   typecheck:
