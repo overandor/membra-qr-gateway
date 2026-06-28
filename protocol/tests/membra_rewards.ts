@@ -32,6 +32,7 @@ describe("membra_rewards", () => {
   let rewardsPoolBump: number;
   let rewardVault: PublicKey;
   let stakeVault: PublicKey;
+  let penaltyDestAta: PublicKey;
 
   // Lock durations in seconds
   const LOCK_NONE = new BN(0);
@@ -69,6 +70,12 @@ describe("membra_rewards", () => {
       connection, payer.payer, authority.publicKey, authority.publicKey, 6
     );
 
+    // unstake/close_lock require penalty_destination to resolve to a real
+    // SPL TokenAccount of stake_mint, not just any wallet pubkey.
+    penaltyDestAta = await createAssociatedTokenAccount(
+      connection, payer.payer, stakeMint, penaltyDest.publicKey
+    );
+
     [rewardsPoolPda, rewardsPoolBump] = PublicKey.findProgramAddressSync(
       [Buffer.from("rewards_pool"), rewardMint.toBuffer(), stakeMint.toBuffer()],
       program.programId
@@ -99,7 +106,7 @@ describe("membra_rewards", () => {
         stakeMint,
         rewardVault,
         stakeVault,
-        penaltyDestination: penaltyDest.publicKey,
+        penaltyDestination: penaltyDestAta,
         rewardsPool: rewardsPoolPda,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
@@ -135,7 +142,7 @@ describe("membra_rewards", () => {
           stakeMint,
           rewardVault: badRewardVault,
           stakeVault: badStakeVault,
-          penaltyDestination: penaltyDest.publicKey,
+          penaltyDestination: penaltyDestAta,
           rewardsPool: badPool,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
@@ -430,7 +437,7 @@ describe("membra_rewards", () => {
         stakeMint,
         userStakeAta: staker2StakeAta,
         stakeVault,
-        penaltyDestination: penaltyDest.publicKey,
+        penaltyDestinationAta: penaltyDestAta,
         userStakeAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
       } as any)
@@ -456,7 +463,9 @@ describe("membra_rewards", () => {
       program.programId
     );
     const acct = await program.account.userStakeAccount.fetch(userStakeAccount) as any;
-    const excessAmount = acct.stakedAmount.addn(1_000_000_000); // more than staked
+    // addn()/subn() only accept bn.js single-word values (< 0x4000000);
+    // use add() with a BN for amounts above that range.
+    const excessAmount = acct.stakedAmount.add(new BN(1_000_000_000)); // more than staked
 
     try {
       await program.methods
@@ -467,7 +476,7 @@ describe("membra_rewards", () => {
           stakeMint,
           userStakeAta: staker2StakeAta,
           stakeVault,
-          penaltyDestination: penaltyDest.publicKey,
+          penaltyDestinationAta: penaltyDestAta,
           userStakeAccount,
           tokenProgram: TOKEN_PROGRAM_ID,
         } as any)
@@ -515,7 +524,12 @@ describe("membra_rewards", () => {
       .signers([staker2])
       .rpc();
 
-    // Close the flexible lock
+    const userBalanceBefore = await getAccount(connection, staker2StakeAta);
+
+    // Close the flexible lock. The `close = user` constraint on lock_record
+    // deallocates the PDA on success, so it can no longer be fetched as a
+    // LockRecord afterwards — verify via token balance and account removal
+    // instead of reading fields off the (now-closed) account.
     await program.methods
       .closeLock()
       .accounts({
@@ -524,23 +538,27 @@ describe("membra_rewards", () => {
         stakeMint,
         userStakeAta: staker2StakeAta,
         stakeVault,
-        penaltyDestination: penaltyDest.publicKey,
+        penaltyDestinationAta: penaltyDestAta,
         lockRecord,
         tokenProgram: TOKEN_PROGRAM_ID,
       } as any)
       .signers([staker2])
       .rpc();
 
-    const record = await program.account.lockRecord.fetch(lockRecord) as any;
-    expect(record.closed).to.be.true;
-    expect(record.penaltyPaid.toNumber()).to.equal(0); // no penalty for flexible
+    const userBalanceAfter = await getAccount(connection, staker2StakeAta);
+    // Flexible lock: no penalty, so the user gets the full locked amount back.
+    expect(
+      BigInt(userBalanceAfter.amount.toString()) - BigInt(userBalanceBefore.amount.toString())
+    ).to.equal(BigInt(amount.toString()));
+
+    expect(await connection.getAccountInfo(lockRecord)).to.be.null;
   });
 
   it("rejects double close of same lock", async () => {
-    // Get the last lock we closed (lockIndex from pool was N before createLock above)
-    // We need to re-fetch to know which lock record was just closed
-    // Find it by fetching all lock records for staker2 — use the one we created above
-    // Instead, test that the general behavior is correct by checking closed == true already
+    // The lock closed in the previous test no longer exists on-chain (its
+    // PDA was deallocated by the `close = user` constraint), so re-using
+    // the same lockRecord address here fails account validation rather
+    // than the (now unreachable) LockAlreadyClosed constraint.
     const pool = await program.account.rewardsPool.fetch(rewardsPoolPda) as any;
     // The lock we just closed has index pool.lockCount - 1
     const lastIndex = pool.lockCount.subn(1);
@@ -565,15 +583,15 @@ describe("membra_rewards", () => {
           stakeMint,
           userStakeAta: staker2StakeAta,
           stakeVault,
-          penaltyDestination: penaltyDest.publicKey,
+          penaltyDestinationAta: penaltyDestAta,
           lockRecord,
           tokenProgram: TOKEN_PROGRAM_ID,
         } as any)
         .signers([staker2])
         .rpc();
-      expect.fail("Should have thrown LockAlreadyClosed");
+      expect.fail("Should have thrown AccountNotInitialized");
     } catch (err) {
-      expect((err as AnchorError).error.errorCode.code).to.equal("LockAlreadyClosed");
+      expect((err as AnchorError).error.errorCode.code).to.equal("AccountNotInitialized");
     }
   });
 
