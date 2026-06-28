@@ -178,6 +178,15 @@ jobs:
           ANCHOR_PROVIDER_URL: http://127.0.0.1:8899
           ANCHOR_WALLET: ~/.config/solana/id.json
 
+      - name: Show test-validator diagnostics on failure
+        if: failure()
+        working-directory: protocol
+        run: |
+          echo "=== target/deploy listing ==="
+          ls -la target/deploy/ || echo "target/deploy missing"
+          echo "=== test-ledger-log.txt (tail) ==="
+          tail -n 300 .anchor/test-ledger/test-ledger-log.txt || echo "log not found"
+
   # ── Security scan ────────────────────────────────────────────────────────
   security:
     name: cargo audit
