@@ -74,9 +74,11 @@ describe("membra_rewards", () => {
       program.programId
     );
 
-    // Create vaults owned by the rewards pool PDA
-    rewardVault = await createAccount(connection, payer.payer, rewardMint, rewardsPoolPda);
-    stakeVault = await createAccount(connection, payer.payer, stakeMint, rewardsPoolPda);
+    // Create vaults owned by the rewards pool PDA. rewardsPoolPda is off-curve,
+    // so an explicit keypair must be passed — otherwise createAccount() falls
+    // back to ATA derivation, which rejects off-curve owners.
+    rewardVault = await createAccount(connection, payer.payer, rewardMint, rewardsPoolPda, Keypair.generate());
+    stakeVault = await createAccount(connection, payer.payer, stakeMint, rewardsPoolPda, Keypair.generate());
 
     // Fund the reward vault with plenty of reward tokens
     await mintTo(
@@ -120,8 +122,8 @@ describe("membra_rewards", () => {
       [Buffer.from("rewards_pool"), badRewardMint.toBuffer(), stakeMint.toBuffer()],
       program.programId
     );
-    const badRewardVault = await createAccount(connection, payer.payer, badRewardMint, badPool);
-    const badStakeVault = await createAccount(connection, payer.payer, stakeMint, badPool);
+    const badRewardVault = await createAccount(connection, payer.payer, badRewardMint, badPool, Keypair.generate());
+    const badStakeVault = await createAccount(connection, payer.payer, stakeMint, badPool, Keypair.generate());
 
     try {
       await program.methods

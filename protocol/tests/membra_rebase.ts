@@ -30,7 +30,7 @@ describe("membra_rebase", () => {
   const REBASE_COEFFICIENT_BPS = new BN(5_000);        // 50% dampening
   const MIN_EPOCH_SECONDS = new BN(1);                 // 1 second (fast for tests)
   const STALE_PRICE_THRESHOLD = new BN(3600);          // 1 hour
-  const VOLATILITY_CIRCUIT_BREAKER_BPS = new BN(5_000); // 50% — high to avoid tripping in tests
+  const VOLATILITY_CIRCUIT_BREAKER_BPS = new BN(9_000); // 90% — high to avoid tripping in tests
 
   const INITIAL_INDEX = new anchor.BN("1000000000000"); // 1e12
 
@@ -50,6 +50,22 @@ describe("membra_rebase", () => {
       volatilityCircuitBreakerBps: VOLATILITY_CIRCUIT_BREAKER_BPS,
       ...overrides,
     } as any;
+  }
+
+  // The rebase state's price_history ring buffer holds PRICE_HISTORY_LEN
+  // entries and feeds compute_twap(). Setting the oracle price only once
+  // leaves stale entries from earlier tests in the buffer, skewing the TWAP.
+  // Flushing the same price PRICE_HISTORY_LEN times overwrites every slot,
+  // guaranteeing the TWAP exactly equals the price just set.
+  const PRICE_HISTORY_LEN = 8;
+  async function setOraclePriceFlushed(price: BN, confidence: BN) {
+    for (let i = 0; i < PRICE_HISTORY_LEN; i++) {
+      await program.methods
+        .updateOraclePrice(price, confidence, new BN(Math.floor(Date.now() / 1000)))
+        .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
+        .signers([authority])
+        .rpc();
+    }
   }
 
   before(async () => {
@@ -285,13 +301,10 @@ describe("membra_rebase", () => {
   it("executes rebase with price at target (0 bps adjustment)", async () => {
     // First set price equal to target: $0.55
     const targetPrice = new BN(550_000);
-    const now = Math.floor(Date.now() / 1000);
 
-    await program.methods
-      .updateOraclePrice(targetPrice, new BN(1_000), new BN(now))
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
-      .signers([authority])
-      .rpc();
+    // Flush the ring buffer so the TWAP exactly equals targetPrice, free of
+    // stale entries left over from earlier oracle-price tests.
+    await setOraclePriceFlushed(targetPrice, new BN(1_000));
 
     // Allow sufficient time to pass (at least min_epoch_seconds = 1)
     await new Promise((r) => setTimeout(r, 1200));
@@ -322,12 +335,7 @@ describe("membra_rebase", () => {
     // raw_rebase_bps = 4545 * 5000 / 10000 = +2272, clamped to +500
     // new_index = index * (10000 + 500) / 10000  → index grows
 
-    const now = Math.floor(Date.now() / 1000);
-    await program.methods
-      .updateOraclePrice(new BN(800_000), new BN(5_000), new BN(now))
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
-      .signers([authority])
-      .rpc();
+    await setOraclePriceFlushed(new BN(800_000), new BN(5_000));
 
     await new Promise((r) => setTimeout(r, 1200));
 
@@ -351,12 +359,7 @@ describe("membra_rebase", () => {
     // Price $0.40 < target $0.55: negative deviation → positive raw_rebase but
     // wait — (0.40 - 0.55)/0.55 = -2727 bps, raw = -2727 * 5000/10000 = -1363
     // clamped to -500 bps → index decreases
-    const now = Math.floor(Date.now() / 1000);
-    await program.methods
-      .updateOraclePrice(new BN(400_000), new BN(3_000), new BN(now))
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
-      .signers([authority])
-      .rpc();
+    await setOraclePriceFlushed(new BN(400_000), new BN(3_000));
 
     await new Promise((r) => setTimeout(r, 1200));
 
@@ -377,18 +380,53 @@ describe("membra_rebase", () => {
   });
 
   it("rejects rebase before epoch duration has elapsed", async () => {
-    // Two rebases in quick succession (min_epoch_seconds = 1, but we don't sleep)
-    const now = Math.floor(Date.now() / 1000);
+    // min_epoch_seconds = 1 is too tight to reliably distinguish "rejected"
+    // from "just slow CI/RPC round-trip", so this test uses an isolated
+    // state with a large min_epoch_seconds: a single back-to-back RPC
+    // round-trip can't plausibly take 30 seconds.
+    const epochMint = await createMint(
+      connection,
+      payer.payer,
+      authority.publicKey,
+      authority.publicKey,
+      6
+    );
+    const [epochStatePda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("rebase_state"), epochMint.toBuffer()],
+      program.programId
+    );
+
     await program.methods
-      .updateOraclePrice(new BN(550_000), new BN(1_000), new BN(now))
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
+      .initializeRebase(buildInitParams({ minEpochSeconds: new BN(30) }))
+      .accounts({
+        authority: authority.publicKey,
+        tokenMint: epochMint,
+        rebaseState: epochStatePda,
+        systemProgram: SystemProgram.programId,
+      } as any)
       .signers([authority])
       .rpc();
 
+    const now = Math.floor(Date.now() / 1000);
+    await program.methods
+      .updateOraclePrice(new BN(550_000), new BN(1_000), new BN(now))
+      .accounts({ authority: authority.publicKey, rebaseState: epochStatePda } as any)
+      .signers([authority])
+      .rpc();
+
+    // First-ever rebase: last_rebase_ts == 0, so the epoch-elapsed gate
+    // always passes regardless of timing.
+    await program.methods
+      .executeRebase()
+      .accounts({ keeper: keeper.publicKey, rebaseState: epochStatePda } as any)
+      .signers([keeper])
+      .rpc();
+
+    // Immediate second rebase must be rejected: min_epoch_seconds = 30.
     try {
       await program.methods
         .executeRebase()
-        .accounts({ keeper: keeper.publicKey, rebaseState: rebaseStatePda } as any)
+        .accounts({ keeper: keeper.publicKey, rebaseState: epochStatePda } as any)
         .signers([keeper])
         .rpc();
       expect.fail("Should have thrown EpochTooSoon");
@@ -425,7 +463,7 @@ describe("membra_rebase", () => {
   it("blocks rebase when paused", async () => {
     await program.methods
       .pauseRebase()
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
+      .accounts({ caller: authority.publicKey, rebaseState: rebaseStatePda } as any)
       .signers([authority])
       .rpc();
 
@@ -450,7 +488,7 @@ describe("membra_rebase", () => {
     // Already paused from prior test; resume
     await program.methods
       .resumeRebase()
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
+      .accounts({ caller: authority.publicKey, rebaseState: rebaseStatePda } as any)
       .signers([authority])
       .rpc();
 
@@ -459,7 +497,7 @@ describe("membra_rebase", () => {
 
     await program.methods
       .pauseRebase()
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
+      .accounts({ caller: authority.publicKey, rebaseState: rebaseStatePda } as any)
       .signers([authority])
       .rpc();
 
@@ -468,7 +506,7 @@ describe("membra_rebase", () => {
 
     await program.methods
       .resumeRebase()
-      .accounts({ authority: authority.publicKey, rebaseState: rebaseStatePda } as any)
+      .accounts({ caller: authority.publicKey, rebaseState: rebaseStatePda } as any)
       .signers([authority])
       .rpc();
 
