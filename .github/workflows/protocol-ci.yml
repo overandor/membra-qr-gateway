@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - "protocol/**"
+  workflow_dispatch: {}
 
 env:
   ANCHOR_VERSION: "0.29.0"
