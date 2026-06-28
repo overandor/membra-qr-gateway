@@ -6,6 +6,7 @@ members = [
     "programs/membra_governance",
     "programs/membra_mmce",
     "programs/membra_llm",
+    "programs/membra_attestation",
 ]
 resolver = "2"
 
