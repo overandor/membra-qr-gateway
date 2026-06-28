@@ -16,6 +16,9 @@ export const MEMBRA_GOVERNANCE_PROGRAM_ID = new PublicKey(
 export const MEMBRA_ATTESTATION_PROGRAM_ID = new PublicKey(
   "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkk476zPFsLnS"
 );
+export const MEMBRA_LLM_PROGRAM_ID = new PublicKey(
+  "MeLM111111111111111111111111111111111111111"
+);
 
 // PDA seeds
 export const IDO_CONFIG_SEED = Buffer.from("ido_config");
