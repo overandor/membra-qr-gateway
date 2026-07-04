@@ -1,11 +1,17 @@
-import { keccak256 } from 'ethereum-cryptography/keccak';
-import { bytesToHex, hexToBytes } from 'ethereum-cryptography/utils';
 import { createHash } from 'crypto';
 
 /**
  * Merkle Tree implementation for LLM inference response verification
  * Supports deep Merkle trees for GitHub proof capsule integration
  */
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('hex');
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  return new Uint8Array(Buffer.from(hex, 'hex'));
+}
 
 export interface MerkleProof {
   leaf: Uint8Array;

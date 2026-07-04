@@ -36,7 +36,7 @@ export interface InferenceResponse {
   bump: number;
 }
 
-export interface MerkleTree {
+export interface MerkleTreeAccount {
   root: Uint8Array;
   leafCount: BN;
   depth: number;

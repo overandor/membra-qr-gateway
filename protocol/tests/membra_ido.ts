@@ -96,12 +96,16 @@ describe("membra_ido", () => {
       program.programId
     );
 
-    // Create token vault as a regular SPL token account owned by idoConfigPda
+    // Create token vault as a regular SPL token account owned by idoConfigPda.
+    // idoConfigPda is off-curve, so an explicit keypair must be passed —
+    // otherwise createAccount() falls back to ATA derivation, which rejects
+    // off-curve owners.
     tokenVault = await createAccount(
       connection,
       payer.payer,
       tokenMint,
-      idoConfigPda
+      idoConfigPda,
+      Keypair.generate()
     );
 
     // Create payment vault owned by idoConfigPda
@@ -109,7 +113,8 @@ describe("membra_ido", () => {
       connection,
       payer.payer,
       paymentMint,
-      idoConfigPda
+      idoConfigPda,
+      Keypair.generate()
     );
 
     // Create a treasury token account (needed for finalize when burn=false)
@@ -193,8 +198,8 @@ describe("membra_ido", () => {
       [Buffer.from("ido_config"), badMint.toBuffer()],
       program.programId
     );
-    const badVault = await createAccount(connection, payer.payer, badMint, badConfig);
-    const badPayVault = await createAccount(connection, payer.payer, paymentMint, badConfig);
+    const badVault = await createAccount(connection, payer.payer, badMint, badConfig, Keypair.generate());
+    const badPayVault = await createAccount(connection, payer.payer, paymentMint, badConfig, Keypair.generate());
 
     try {
       await program.methods
@@ -242,8 +247,8 @@ describe("membra_ido", () => {
       [Buffer.from("ido_config"), badMint.toBuffer()],
       program.programId
     );
-    const badVault = await createAccount(connection, payer.payer, badMint, badConfig);
-    const badPayVault = await createAccount(connection, payer.payer, paymentMint, badConfig);
+    const badVault = await createAccount(connection, payer.payer, badMint, badConfig, Keypair.generate());
+    const badPayVault = await createAccount(connection, payer.payer, paymentMint, badConfig, Keypair.generate());
 
     try {
       await program.methods
@@ -294,8 +299,8 @@ describe("membra_ido", () => {
       program.programId
     );
 
-    activeTokenVault = await createAccount(connection, payer.payer, activeIdoMint, activeIdoConfig);
-    activePaymentVault = await createAccount(connection, payer.payer, paymentMint, activeIdoConfig);
+    activeTokenVault = await createAccount(connection, payer.payer, activeIdoMint, activeIdoConfig, Keypair.generate());
+    activePaymentVault = await createAccount(connection, payer.payer, paymentMint, activeIdoConfig, Keypair.generate());
 
     await mintTo(
       connection,
@@ -592,8 +597,8 @@ describe("membra_ido", () => {
       [Buffer.from("ido_config"), cancelMint.toBuffer()],
       program.programId
     );
-    const cancelVault = await createAccount(connection, payer.payer, cancelMint, cancelConfig);
-    const cancelPayVault = await createAccount(connection, payer.payer, paymentMint, cancelConfig);
+    const cancelVault = await createAccount(connection, payer.payer, cancelMint, cancelConfig, Keypair.generate());
+    const cancelPayVault = await createAccount(connection, payer.payer, paymentMint, cancelConfig, Keypair.generate());
     await mintTo(connection, payer.payer, cancelMint, cancelVault, authority.publicKey, 1_000_000_000, [authority]);
 
     const now = Math.floor(Date.now() / 1000);

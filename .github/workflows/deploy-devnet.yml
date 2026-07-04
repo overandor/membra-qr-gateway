@@ -1,0 +1,241 @@
+name: Deploy — Devnet (dry run)
+
+# Manually triggered only — never runs automatically to avoid accidental
+# network deployments or SOL expenditure.
+on:
+  workflow_dispatch:
+    inputs:
+      airdrop_sol:
+        description: "SOL to airdrop per request (up to 2, devnet limit)"
+        required: false
+        default: "2"
+      airdrop_rounds:
+        description: "Number of airdrop rounds (total = rounds × airdrop_sol)"
+        required: false
+        default: "6"
+      run_tests:
+        description: "Run anchor test suite against devnet after deploy"
+        required: false
+        type: boolean
+        default: true
+
+env:
+  ANCHOR_VERSION: "0.29.0"
+  SOLANA_VERSION: "1.18.26"
+  NODE_VERSION: "20"
+  RUST_TOOLCHAIN: "1.85.0"
+
+jobs:
+  deploy:
+    name: devnet deploy
+    runs-on: ubuntu-latest
+    # Expose program addresses as job outputs so downstream jobs can consume them.
+    outputs:
+      membra_ido: ${{ steps.addrs.outputs.membra_ido }}
+      membra_rebase: ${{ steps.addrs.outputs.membra_rebase }}
+      membra_rewards: ${{ steps.addrs.outputs.membra_rewards }}
+      membra_governance: ${{ steps.addrs.outputs.membra_governance }}
+      membra_attestation: ${{ steps.addrs.outputs.membra_attestation }}
+      membra_mmce: ${{ steps.addrs.outputs.membra_mmce }}
+      membra_llm: ${{ steps.addrs.outputs.membra_llm }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            protocol/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('protocol/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install Solana CLI
+        run: |
+          curl -sSfL "https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install" \
+            -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Verify Solana tools
+        run: |
+          solana --version
+          cargo build-sbf --version
+
+      - name: Cache Anchor CLI binary
+        id: cache-anchor
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/anchor
+          key: anchor-cli-${{ env.ANCHOR_VERSION }}-${{ runner.os }}-rust1.76-v4
+
+      - name: Install Anchor CLI
+        if: steps.cache-anchor.outputs.cache-hit != 'true'
+        run: |
+          rustup toolchain install 1.76.0 --profile minimal
+          cargo +1.76.0 install anchor-cli --version ${{ env.ANCHOR_VERSION }} --locked
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: protocol/package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: protocol
+        run: npm ci
+
+      # ── Wallet setup ────────────────────────────────────────────────────────
+      # If DEVNET_DEPLOYER_KEYPAIR secret is set (JSON byte array, e.g.
+      # [12,34,...]) use it so programs deploy to stable addresses across runs.
+      # Otherwise generate an ephemeral keypair and airdrop from the devnet
+      # faucet (suitable for a first-time dry run; program IDs will differ on
+      # each run since keypairs are not persisted).
+      - name: Set up deployer wallet
+        env:
+          DEVNET_DEPLOYER_KEYPAIR: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+        run: |
+          mkdir -p ~/.config/solana
+          if [ -n "$DEVNET_DEPLOYER_KEYPAIR" ]; then
+            echo "$DEVNET_DEPLOYER_KEYPAIR" > ~/.config/solana/id.json
+            echo "MODE=stable (stored keypair)" >> $GITHUB_STEP_SUMMARY
+          else
+            solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+            echo "MODE=ephemeral (new keypair — program IDs will differ each run)" >> $GITHUB_STEP_SUMMARY
+          fi
+          solana config set --url devnet --keypair ~/.config/solana/id.json
+          DEPLOYER=$(solana-keygen pubkey ~/.config/solana/id.json)
+          echo "DEPLOYER_PUBKEY=$DEPLOYER" >> $GITHUB_ENV
+          echo "Deployer pubkey: $DEPLOYER"
+
+      - name: Airdrop SOL to deployer
+        run: |
+          SOL=${{ inputs.airdrop_sol || '2' }}
+          ROUNDS=${{ inputs.airdrop_rounds || '6' }}
+          echo "Requesting $ROUNDS × ${SOL} SOL airdrops (total target: $((ROUNDS * SOL)) SOL)"
+          for i in $(seq 1 $ROUNDS); do
+            echo "Airdrop round $i/$ROUNDS..."
+            solana airdrop "$SOL" --url devnet || echo "  (airdrop $i failed — rate limited or faucet dry; continuing)"
+            sleep 5
+          done
+          BALANCE=$(solana balance --url devnet)
+          echo "Deployer balance after airdrops: $BALANCE"
+          echo "DEPLOYER_BALANCE=$BALANCE" >> $GITHUB_ENV
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build programs
+        working-directory: protocol
+        run: anchor build
+
+      - name: Sync program keys
+        working-directory: protocol
+        run: anchor keys sync
+
+      # ── Deploy ───────────────────────────────────────────────────────────────
+      - name: Deploy to devnet
+        working-directory: protocol
+        run: |
+          anchor deploy --provider.cluster devnet 2>&1 | tee /tmp/deploy.log
+
+      # ── Report ───────────────────────────────────────────────────────────────
+      - name: Collect deployed program addresses
+        id: addrs
+        working-directory: protocol
+        run: |
+          PROGRAMS="membra_ido membra_rebase membra_rewards membra_governance membra_attestation membra_mmce membra_llm"
+          for prog in $PROGRAMS; do
+            KEYPAIR="target/deploy/${prog}-keypair.json"
+            if [ -f "$KEYPAIR" ]; then
+              ADDR=$(solana-keygen pubkey "$KEYPAIR")
+            else
+              ADDR="UNKNOWN"
+            fi
+            # job outputs (for downstream jobs)
+            echo "${prog}=${ADDR}" >> $GITHUB_OUTPUT
+            # env vars (for subsequent steps in this job)
+            echo "ADDR_${prog}=${ADDR}" >> $GITHUB_ENV
+          done
+
+      - name: Write deployment summary
+        run: |
+          {
+            echo "## Devnet Deployment Report"
+            echo ""
+            echo "**Deployer wallet:** \`$DEPLOYER_PUBKEY\`"
+            echo ""
+            echo "| Program | Address | Explorer |"
+            echo "|---------|---------|----------|"
+            for prog in membra_ido membra_rebase membra_rewards membra_governance membra_attestation membra_mmce membra_llm; do
+              ENV_VAR="ADDR_${prog}"
+              ADDR="${!ENV_VAR:-UNKNOWN}"
+              LINK="https://explorer.solana.com/address/${ADDR}?cluster=devnet"
+              echo "| \`$prog\` | \`$ADDR\` | [View](${LINK}) |"
+            done
+            echo ""
+            echo "> Programs with ephemeral keypairs deploy to new addresses on each run."
+            echo "> To maintain stable addresses, store each program's keypair JSON as a"
+            echo "> GitHub Actions secret (\`DEVNET_DEPLOYER_KEYPAIR\` for the wallet) and"
+            echo "> restore program keypairs to \`protocol/target/deploy/<prog>-keypair.json\`"
+            echo "> before \`anchor deploy\`."
+          } >> $GITHUB_STEP_SUMMARY
+
+      # ── Smoke test (optional) ─────────────────────────────────────────────────
+      - name: Smoke-test — verify programs exist on devnet
+        run: |
+          echo "=== Program account verification ==="
+          PROGRAMS="membra_ido membra_rebase membra_rewards membra_governance membra_attestation membra_mmce membra_llm"
+          ALL_OK=true
+          for prog in $PROGRAMS; do
+            ENV_VAR="ADDR_${prog}"
+            ADDR="${!ENV_VAR}"
+            if [ -z "$ADDR" ] || [ "$ADDR" = "UNKNOWN" ]; then
+              echo "SKIP $prog (address not available)"
+              continue
+            fi
+            INFO=$(solana program show "$ADDR" --url devnet 2>&1) || true
+            if echo "$INFO" | grep -q "Program Id:"; then
+              echo "OK   $prog → $ADDR"
+            else
+              echo "FAIL $prog → $ADDR (not found on devnet)"
+              ALL_OK=false
+            fi
+          done
+          $ALL_OK && echo "All programs confirmed on devnet."
+
+      - name: Run anchor test suite against devnet
+        if: ${{ inputs.run_tests == true || inputs.run_tests == 'true' }}
+        working-directory: protocol
+        # Informational — devnet is shared/slow so test failures are expected
+        # occasionally due to RPC rate limits or timing; they do not fail the
+        # deployment itself.
+        run: |
+          anchor test --skip-build 2>&1 | tee /tmp/test.log || true
+          if grep -q "passing" /tmp/test.log; then
+            echo "Test result: $(grep -E '[0-9]+ passing' /tmp/test.log | tail -1)"
+          fi
+          if grep -q "failing" /tmp/test.log; then
+            echo "WARN: $(grep -E '[0-9]+ failing' /tmp/test.log | tail -1)"
+          fi
+        env:
+          ANCHOR_PROVIDER_URL: https://api.devnet.solana.com
+          ANCHOR_WALLET: ~/.config/solana/id.json
+        continue-on-error: true
+
+      # ── Artifacts ────────────────────────────────────────────────────────────
+      - name: Upload deploy artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devnet-deploy-artifacts
+          path: |
+            protocol/target/deploy/
+            protocol/target/idl/
+            /tmp/deploy.log
+          retention-days: 30
